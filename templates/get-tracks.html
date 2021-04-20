@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Get track
+{% endblock %}
+
+{% block body %}
+    <li>
+        {% for track in saved_tracks %}
+            <ul>Track name: {{ track['items']['track']['name'] }}</ul>
+            <ul>Album name: {{ track['items']['track']['album']['name'] }}</ul>
+            <ul>Artist(s): {{ track['items']['track']['artists'] }}</ul><br>
+        {% endfor %}
+    </li>
+{% endblock body %}
