@@ -16,3 +16,9 @@ search
     padding-bottom: 2rem;
     font-size: 40pt;
 }
+
+.results
+{
+    padding-top: 10px;
+    padding-left: 50%;
+}
