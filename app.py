@@ -54,6 +54,7 @@ def index():
 # Has the user log in and authorize SpotiHelp to use information from Spotify
 @app.route("/login")
 def login():
+    session.clear()
     sp_oauth = create_spotify_oauth() # Creates a new sp_oauth object everytime a user logs in
     auth_url = sp_oauth.get_authorize_url() # Passes the authorization url into a variable
 
@@ -74,9 +75,9 @@ def redirectPage():
         token_info = get_token()
     except:
         print("-- User not logged in! --")
-        return redirect(url_for("index", _external=False))
+        return redirect(url_for("index", _external=True))
 
-    return redirect(url_for("index", _external=False))
+    return redirect(url_for("index", _external=True))
 
 
 # Gets user tracks
