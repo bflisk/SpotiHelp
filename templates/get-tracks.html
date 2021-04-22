@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block body %}
+    <h1>{{ pageNum }}</h1>
     <div class="results">
         {% for i in saved_tracks %}
             {% for track in i %}
@@ -18,10 +19,12 @@
         {% endfor %}
             
     </div>
-    <form name="pageDown">
-        <button class="btn" type="submit"><</button>
-    </form>
-    <form name="pageUp">
-        <button class="btn" type="submit">></button>
+
+    <form action="/get-tracks" method="post">
+        <div class="form-group">
+            <button name="pageNum" value={{ pageNum }}>Send Page</button>
+            <button class="btn btn-primary" type="submit" name="page" value="-1"><</button>
+            <button class="btn btn-primary" type="submit" name="page" value="1">></button>
+        </div>  
     </form>
 {% endblock body %}

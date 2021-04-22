@@ -92,36 +92,51 @@ def redirectPage():
 
 # Gets user tracks
 # TODO Require user log-in
-@app.route("/get-tracks")
+@app.route("/get-tracks", methods=["GET", "POST"])
 def getTracks():
-    # Tries to get token data. If it doesn't succeed, returns user back to index page
-    try:
-        token_info = get_token()
-    except:
-        print("-- User not logged in! --")
-        return redirect("/login")
+    if request.method == "POST":
+            # Tries to get token data. If it doesn't succeed, returns user back to index page
+        try:
+            token_info = get_token()
+        except:
+            print("-- User not logged in! --")
+            return redirect("/login")
+        
+        try:
+            sp = spotipy.Spotify(auth=token_info['access_token'])
+        except:
+            return redirect("/login")
 
-    # Accesses user's saved tracks using access token
-    pageNum = request.form.get("page", 0) # Gets page number user wants to be on
-    """if pageNum < 0:
-        pageNum = 0"""
-    
-    saved_tracks = []
-    iteration = 0
-    try:
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-    except:
-        return redirect("/login")
-    
-    while True:
-        items = sp.current_user_saved_tracks(limit=50, offset=iteration)['items']
-        iteration += 50
-        saved_tracks.append(items) # Appends the list with all of the user's saved tracks
-        if len(items) < 50: # Breaks out of loop when it reaches the end of the user's library
-            break
+        pageNum = int(request.form.get("pageNum"))
+        pageNum += int(request.form.get("page")) # Gets page number user wants to be on
+        if pageNum < 0:
+            pageNum = 0
+        print(pageNum)     
+        
+        saved_tracks = []
+        saved_tracks.append(sp.current_user_saved_tracks(limit=20, offset=pageNum * 20)['items'])
 
-    return render_template("get-tracks.html", saved_tracks=saved_tracks, pageNum=pageNum)
-    #return len(saved_tracks)
+        return render_template("get-tracks.html", saved_tracks=saved_tracks, pageNum=pageNum)
+    else:
+        # Tries to get token data. If it doesn't succeed, returns user back to index page
+        try:
+            token_info = get_token()
+        except:
+            print("-- User not logged in! --")
+            return redirect("/login")
+        
+        try:
+            sp = spotipy.Spotify(auth=token_info['access_token'])
+        except:
+            return redirect("/login")
+
+        # Default values for initially loaded page
+        saved_tracks = []
+        pageNum = 0 
+
+        saved_tracks.append(sp.current_user_saved_tracks(limit=20, offset=0)['items'])   
+
+        return render_template("get-tracks.html", saved_tracks=saved_tracks, pageNum=pageNum)
 
 
 # Allows the user to create new smart playlists
