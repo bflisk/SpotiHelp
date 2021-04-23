@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block body %}
-    <h1>{{ pageNum }}</h1>
+    <h1>Page: {{ pageNum + 1 }}</h1>
     <div class="results">
         {% for i in saved_tracks %}
             {% for track in i %}

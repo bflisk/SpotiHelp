@@ -28,27 +28,32 @@
     <body>
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
           <a class="navbar-brand" href="/">SpotiHelp</a>
-          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
+          
+          {% if session.get("user_id") %}
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
 
-          <a class="btn" href="/login">Login</a>
-          <a class="btn" href="/get-tracks">Tracks</a>
+            <a class="btn" href="/get-tracks" id="navbarSupportedContent">Tracks</a>
+            <a class="btn" href="/logout" method="post" id="navbarSupportedContent">Log Out</a>
 
-          <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav mr-auto">
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  Smart Playlists
-                </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a class="dropdown-item" href="/playlist-new">New</a>
-                  <a class="dropdown-item" href="/playlist-edit">Edit</a>
-                </div>
-              </li>
-            </ul>
-            {% block search %}{% endblock %}
-          </div>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+              <ul class="navbar-nav mr-auto">
+                <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Smart Playlists
+                  </a>
+                  <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="/playlist-new">New</a>
+                    <a class="dropdown-item" href="/playlist-edit">Edit</a>
+                  </div>
+                </li>
+              </ul>
+              {% block search %}{% endblock %}
+            </div>
+          {% else %}
+            <a class="btn" href="/login">Login</a>
+          {% endif %}
         </nav>
 
         {% block body %}{% endblock %}
