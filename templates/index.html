@@ -12,18 +12,16 @@
 {% endblock %}
 
 {% block body %}
-
     <div>
        <h1 class="header">SpotiHelp Home</h1>
     </div>
 
     <div class="results">
-        {% for i in var %}
-            <p1>Name: {{ i['name'] }}</p1><br>
-            <p2>Followers: {{ i['followers']['total'] }}</p2><br>
-            <p3>Popularity: {{ i['popularity'] }}</p3><br>
-            <a class="btn btn-secondary" type="submit" href={{ i['external_urls']['spotify'] }}>{{ i['name'] }}</a><br><br>
+        {% for result in results %}
+            <p1>Name: {{ result['name'] }}</p1><br>
+            <p2>Followers: {{ result['followers']['total'] }}</p2><br>
+            <p3>Popularity: {{ result['popularity'] }}</p3><br>
+            <a class="btn btn-secondary" type="submit" href={{ result['external_urls']['spotify'] }}>{{ result['name'] }}</a><br><br>
         {% endfor %}
     </div>
-
 {% endblock %}

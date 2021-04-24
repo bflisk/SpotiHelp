@@ -72,6 +72,7 @@ def create_spotify_oauth():
 # Returns a valid access token, refreshing it if needed
 def get_token():
     token_info = session.get("token_info", None) # Gives token information if it exists, otherwise given 'None'
+    print("PING PING PING")
 
     # Checks if token_info is 'None'
     if not token_info:
@@ -79,10 +80,14 @@ def get_token():
     
     # Checks if token is close to expiring
     now = int(time.time()) # Gets current time
+    print("slkdjfghlskdfjhgslkdjfghslkjdfghlskjdfhglskdjfhglksjhdfglksdjhfg")
+    print(token_info)
     is_expired = token_info['expires_at'] - now < 60 # T or F depending on condition
+    print(now)
 
     # If the token is close to expiring, refresh it
     if is_expired:
+        print("TOKEN EXPIRED")
         sp_oauth = create_spotify_oauth() 
         token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
 
@@ -100,6 +105,20 @@ def clear_session():
     except:
         pass
         
+
+# Creates a spotify object
+def create_sp():
+    # Tries to get token data. If it doesn't succeed, returns user back to index page
+    try:
+        token_info = get_token()
+        print("token")
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        print("sp object")
+    except:
+        print('create token failure')
+        return redirect(url_for("login"))
+
+    return sp
 
 # --- Routable functions ---
 
@@ -120,7 +139,6 @@ def login():
 # Homepage
 @app.route("/", methods=["GET", "POST"])
 def index():
-
     if request.method == "POST":
         name = request.form.get("search")
 
@@ -132,10 +150,9 @@ def index():
             artist = items[0]
             print(artist['name'], artist['images'][0]['url'])
 
-        return render_template("index.html", var=results['artists']['items'])
+        return render_template("index.html", results=results['artists']['items'])
 
     else:
-
         return render_template("index.html")
 
 
@@ -146,9 +163,12 @@ def redirectPage():
 
     # Gets token information from the response 
     code = request.args.get('code')
-    token_info = sp_oauth.get_access_token(code)
+    # token_info = sp_oauth.get_access_token(code)
+    token_info = get_token()
     session["token_info"] = token_info # Saves token info into the the session
-    sp = spotipy.Spotify(auth=token_info['access_token']) # Parses spotify response information
+
+    # sp = spotipy.Spotify(auth=token_info['access_token']) # Parses spotify response information
+    sp = create_sp()
 
     username = sp.current_user()['display_name'] # Gets current user's username
 
@@ -157,6 +177,10 @@ def redirectPage():
         db.execute('INSERT INTO users (username) VALUES (?);', username)
 
     session["user_id"] = db.execute("SELECT id FROM users WHERE username=?", username) # Sets session user id
+    session["username"] = username # Sets session username
+    print("--------------------------------------------------------------------")
+    print(sp.current_user())
+    print("--------------------------------------------------------------------")
 
     # Tries to get token data. If it doesn't succeed, returns user back to index page
     try:
@@ -180,60 +204,42 @@ def logout():
 @app.route("/get-tracks", methods=["GET", "POST"])
 @login_required
 def getTracks():
-    if request.method == "POST":
-        # Tries to get token data. If it doesn't succeed, returns user back to index page
-        try:
-            token_info = get_token()
-        except:
-            print("-- User not logged in! --")
-            return redirect(url_for("login"))
-        
-        try:
-            sp = spotipy.Spotify(auth=token_info['access_token'])
-        except:
-            print(' WAAAAdfgtyytessssssssssssssssssssssssssssssssssssssssss')
-            return redirect(url_for("login"))
+    sp = create_sp() # Creates a new spotify object 
+    total_tracks = sp.current_user_saved_tracks(limit=1, offset=0)['total'] # Total tracks user has saved
+    batch = 20 # Amounts of tracks to show per page
 
-        pageNum = int(request.form.get("pageNum"))
-        pageNum += int(request.form.get("page")) # Gets page number user wants to be on
+    if request.method == "POST": 
+        pageNum = session["track_pageNum"] # Gets the current page number
+        pageNum += int(request.form.get("page")) # Moves one page forward or backward
+
+        # If the user specifies a page number, take them there
+        if request.form.get("pageSearch"):
+            pageNum = int(request.form.get("pageSearch"))
+
+        # Makes sure page number is valid
         if pageNum < 0:
-            pageNum = 0 
+            pageNum = 0
+        elif pageNum > total_tracks/batch:
+            pageNum = int(total_tracks/batch) 
         
-        saved_tracks = []
-        saved_tracks.append(sp.current_user_saved_tracks(limit=20, offset=pageNum * 20)['items'])
+        session["track_pageNum"] = pageNum # Sets the session's page number       
+        saved_tracks = sp.current_user_saved_tracks(limit=batch, offset=pageNum * batch)['items'] # Retrieves the designated page of user tracks
 
-        return render_template("get-tracks.html", saved_tracks=saved_tracks, pageNum=pageNum)
+        return render_template("get-tracks.html", saved_tracks=saved_tracks, total_tracks=total_tracks, pageNum=pageNum)
     else:
-        # Tries to get token data. If it doesn't succeed, returns user back to index page
-        try:
-            token_info = get_token()
-        except:
-            print("-- User not logged in! --")
-            return redirect(url_for("login"))
-        
-        try:
-            sp = spotipy.Spotify(auth=token_info['access_token'])
-        except:
-            return redirect(url_for("login"))
+        pageNum = 0 # Default value for initially loaded page
+        session["track_pageNum"] = pageNum # Sets the session's page number
 
-        # Default values for initially loaded page
-        saved_tracks = []
-        pageNum = 0 
+        saved_tracks = sp.current_user_saved_tracks(limit=batch, offset=0)['items'] # Retrieves the designated page of user tracks
 
-        print('-----------------------------------------------------------------------')
-        print(token_info)
-        print('-----------------------------------------------------------------------')
-
-        saved_tracks.append(sp.current_user_saved_tracks(limit=20, offset=0)['items'])   
-
-        return render_template("get-tracks.html", saved_tracks=saved_tracks, pageNum=pageNum)
+        return render_template("get-tracks.html", saved_tracks=saved_tracks, total_tracks=total_tracks, pageNum=pageNum)
 
 
 # Allows the user to create new smart playlists
 @app.route("/playlist-new")
+@login_required
 def new_playlist():
-    token_info = get_token()
-    sp = spotipy.Spotify(auth=token_info['access_token'])
+    sp = create_sp() # Creates a new spotify object  
 
     return render_template("playlist-new.html")
 
@@ -242,7 +248,7 @@ def new_playlist():
 @app.route("/playlist-edit")
 @login_required
 def edit_playlist():
-    token_info = get_token()
-    sp = spotipy.Spotify(auth=token_info['access_token'])
+    sp = create_sp() # Creates a new spotify object
+    playlists = sp.user_playlists(session["username"])
 
     return render_template("playlist-edit.html")
