@@ -14,7 +14,7 @@ import spotipy
 import spotipy.util as util
 
 from cs50 import SQL
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
 from flask_session import Session
 from tempfile import mkdtemp
 from werkzeug.exceptions import default_exceptions, HTTPException, InternalServerError
@@ -75,9 +75,11 @@ def get_token():
     print("PING PING PING")
 
     # Checks if token_info is 'None'
-    if not token_info:
-        return redirect(url_for("index", _external=True))
-    
+    """if not token_info:
+        print("FUCK NIGGA")
+        return redirect(url_for("index"))
+    """
+
     # Checks if token is close to expiring
     now = int(time.time()) # Gets current time
     print("slkdjfghlskdfjhgslkdjfghslkjdfghlskjdfhglskdjfhglksjhdfglksdjhfg")
@@ -116,7 +118,7 @@ def create_sp():
         print("sp object")
     except:
         print('create token failure')
-        return redirect(url_for("login"))
+        return redirect(url_for("login")) 
 
     return sp
 
@@ -130,6 +132,9 @@ def login():
 
         sp_oauth = create_spotify_oauth() # Creates a new sp_oauth object everytime a user logs in
         auth_url = sp_oauth.get_authorize_url() # Passes the authorization url into a variable
+        print("LOOK HERE YOU FUCK")
+        print(sp_oauth)
+        #token_info = sp_oauth.get_access_token(sp_oauth)
 
         return redirect(auth_url) # Redirects user to the authorization url
     else:
@@ -169,8 +174,15 @@ def redirectPage():
 
     # sp = spotipy.Spotify(auth=token_info['access_token']) # Parses spotify response information
     sp = create_sp()
+    print("--------------------------------------------------------------------")
+    print(sp)
+    print("--------------------------------------------------------------------")
+    sp = jsonify(sp)
 
-    username = sp.current_user()['display_name'] # Gets current user's username
+    try:
+        username = sp.current_user()['display_name'] # Gets current user's username
+    except:
+        return redirect(url_for("index"))
 
     # Checks if the user is registered and adds to database accordingly
     if not db.execute("SELECT * FROM users WHERE username=?", username):
@@ -178,9 +190,9 @@ def redirectPage():
 
     session["user_id"] = db.execute("SELECT id FROM users WHERE username=?", username) # Sets session user id
     session["username"] = username # Sets session username
-    print("--------------------------------------------------------------------")
-    print(sp.current_user())
-    print("--------------------------------------------------------------------")
+    
+    # print(sp.current_user())
+    
 
     # Tries to get token data. If it doesn't succeed, returns user back to index page
     try:
