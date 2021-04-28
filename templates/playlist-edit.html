@@ -5,30 +5,10 @@
 {% endblock %}
 
 {% block body %}
-{% if specific_playlist == false %}
     <h1 class="header">Edit Existing Playlists</h1>
     {% for playlist in playlists %}
-        <form action={{ url_for('edit_playlist') }} method="post">
+        <form action="/playlist-edit/{{ playlist['playlist_id'] }}" method="get">
             <button class="btn" name="playlist" value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</button>
         </form>
-    {% endfor %}
-{% else %}
-    <h1 class="header">Edit {{ playlist['playlist_name'] }}</h1>
-    <img src={{ playlist['playlist_art'] }} alt="Playlist Art"><br>
-    <a href={{ playlist['playlist_link'] }}>{{ playlist['playlist_name'] }}</a>
-    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample">
-        Tracks
-    </button>
-    <div class="collapse" id="collapseExample">
-        {% for track in playlist['tracks'] %}
-            <ul>Track name: {{ track['track']['name'] }}</ul>
-            <ul>Album name: {{ track['track']['album']['name'] }}</ul>
-            <ul>Artist(s):</ul>
-            {% for artist in track['track']['artists'] %}
-                <ul>{{ artist['name'] }}</ul>
-            {% endfor %}<br>
-        {% endfor %}
-    </div>
-    
-{% endif %}    
+    {% endfor %}   
 {% endblock %}

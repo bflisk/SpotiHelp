@@ -157,17 +157,14 @@ def redirectPage():
     code = request.args.get('code') # Gets code from response URL
     token_info = sp_oauth.get_access_token(code) # Uses code sent from Spotify to exchange for an access & refresh token
     session["token_info"] = token_info # Saves token info into the the session
-
-    # Gets current user's identifying information
     sp = create_sp()
-
-    # Passes identifying info into user's session
     session["username"] = sp.current_user()['display_name'] # Sets session username
-    session["user_id"] = db.execute("SELECT id FROM users WHERE username=?", session["username"])[0]['id'] # Sets session user id
 
     # Checks if the user is registered and adds to database accordingly
     if not db.execute("SELECT * FROM users WHERE username=?", session["username"]):
         db.execute('INSERT INTO users (username) VALUES (?);', session["username"])
+
+    session["user_id"] = db.execute("SELECT id FROM users WHERE username=?", session["username"])[0]['id'] # Sets session user id
         
     return redirect(url_for("index", _external=True))
 
@@ -216,70 +213,109 @@ def getTracks():
 
 
 # Allows the user to create new smart playlists
-@app.route("/playlist-new")
+@app.route("/playlist-new", methods=["GET", "POST"])
 @login_required
 def new_playlist():
-    sp = create_sp() # Creates a new spotify object  
+    sp = create_sp() # Creates a new spotify object 
 
-    return render_template("playlist-new.html")
-
-
-# Allows the user to edit existing playlists
-@app.route("/playlist-edit", methods=["GET", "POST"])
-@login_required
-def edit_playlist():
     if request.method == "POST":
-        sp = create_sp()
-        playlist_id = request.form.get("playlist")
-        temp = sp.playlist(playlist_id)
+        # Gets user's desired new playlist parameters
+        playlist_name = request.form.get("playlist_name")
+        playlist_pub = request.form.get("playlist_pub")
+        playlist_desc = request.form.get("playlist_desc")
+        
+        # Parses whether playlis is public or not
+        if playlist_pub == 'on':
+            playlist_pub = True
+        else:
+            playlist_pub = False
+
+        # Creates the playlist in the user's library
+        sp.user_playlist_create(session['username'], playlist_name, public=playlist_pub, description=playlist_desc)
+
+        # Gets new playlist information from Spotify
+        #sp.playlist
 
         # Tries to get playlist art
         try:
-            playlist_art = temp['images'][0]['url']
+            playlist_art = playlist['images'][0]['url']
         except:
             playlist_art = ''
 
-        playlist = {'playlist_id': playlist_id, 'playlist_name': temp['name'], 
-                    'playlist_art': playlist_art, 'playlist_link': temp['external_urls']['spotify'], 
-                    'tracks': []}
-        
-        for i in temp['tracks']['items']:
-            playlist['tracks'].append(i)
-            print(playlist['tracks'])
+        # Adds the new playlist into the database
+        """db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], playlist['id'], playlist['name'], 
+                    playlist_art, playlist['external_urls']['spotify'])
+        """
 
-        return render_template("playlist-edit.html", playlists=None, playlist=playlist, specific_playlist=True)
+        #return redirect(f"/playlist-edit/{playlist_id}")
+        return render_template("playlist-new.html")
     else:
-        # Gets the user's playlists
-        sp = create_sp()
-        playlists = []
+        return render_template("playlist-new.html")
+
+
+# Allows the user to edit existing playlists
+@app.route("/playlist-edit")
+@login_required
+def edit_playlist():
+    # Gets the user's playlists
+    sp = create_sp()
+    playlists = []
         
-        # Checks whether the user's playlists have been saved in the database yet and retrieves them
-        if not db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id']):
-            # Gets initial batch of playlists from spotify
-            i = 0
+    # Checks whether the user's playlists have been saved in the database yet and retrieves them
+    if not db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id']):
+        # Gets initial batch of playlists from spotify
+        i = 0
+        batch = sp.current_user_playlists(limit=50, offset=i*50)['items']
+
+        # Loops through all user-saved playlists 50 at a time
+        while batch:
+
+            # Loops through current batch of playlists and adds user-created playlists into database
+            for playlist in batch:
+                if playlist['owner']['id'] == session['username']:
+
+                    # Tries to get playlist art
+                    try:
+                        playlist_art = playlist['images'][0]['url']
+                    except:
+                        playlist_art = ''
+
+                    # Adds playlist into database
+                    db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], playlist['id'], playlist['name'], 
+                              playlist_art, playlist['external_urls']['spotify'])  
+
+            # Continues iterating over all user playlists  
+            i += 1
             batch = sp.current_user_playlists(limit=50, offset=i*50)['items']
 
-            # Loops through all user-saved playlists 50 at a time
-            while batch:
+    # Retrieves user's playlists from database       
+    playlists = db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id'])
 
-                # Loops through current batch of playlists and adds user-created playlists into database
-                for playlist in batch:
-                    if playlist['owner']['id'] == session['username']:
-                        # Tries to get playlist art
-                        try:
-                            playlist_art = playlist['images'][0]['url']
-                        except:
-                            playlist_art = ''
+    return render_template("playlist-edit.html", playlists=playlists)
 
-                        # Adds playlist into database
-                        db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], playlist['id'], playlist['name'], 
-                                  playlist_art, playlist['external_urls']['spotify'])  
 
-                # Continues iterating over all user playlists  
-                i += 1
-                batch = sp.current_user_playlists(limit=50, offset=i*50)['items']
+@app.route("/playlist-edit/<playlist>")
+@login_required
+def edit_specific_playlist(playlist):
+    # Gets playlist information
+    sp = create_sp()
+    playlist_id = playlist
+    temp = sp.playlist(playlist_id)
 
-        # Retrieves user's playlists from database       
-        playlists = db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id'])
+    # Tries to get playlist art
+    try:
+        playlist_art = temp['images'][0]['url']
+    except:
+        playlist_art = ''
 
-        return render_template("playlist-edit.html", playlists=playlists, playlist=None, specific_playlist=False)
+    # Parses playlist information into a list
+    playlist = {'playlist_id': playlist_id, 'playlist_name': temp['name'], 
+                'playlist_art': playlist_art, 'playlist_link': temp['external_urls']['spotify'], 
+                'tracks': []}
+    
+    # Gets tracks on the playlist
+    for i in temp['tracks']['items']:
+        playlist['tracks'].append(i)
+        print(playlist['tracks'])
+
+    return render_template("playlist-edit-specific.html", playlist=playlist)
