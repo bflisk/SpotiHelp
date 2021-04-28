@@ -9,7 +9,6 @@
 import os
 import sys
 import time
-import path
 import spotipy
 import spotipy.util as util
 
