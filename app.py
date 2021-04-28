@@ -233,8 +233,15 @@ def edit_playlist():
         sp = create_sp()
         playlist_id = request.form.get("playlist")
         temp = sp.playlist(playlist_id)
+
+        # Tries to get playlist art
+        try:
+            playlist_art = temp['images'][0]['url']
+        except:
+            playlist_art = ''
+
         playlist = {'playlist_id': playlist_id, 'playlist_name': temp['name'], 
-                    'playlist_art': temp['images'][0]['url'], 'playlist_link': temp['external_urls']['spotify'], 
+                    'playlist_art': playlist_art, 'playlist_link': temp['external_urls']['spotify'], 
                     'tracks': []}
         
         for i in temp['tracks']['items']:
