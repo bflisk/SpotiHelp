@@ -6,10 +6,10 @@
 
 {% block body %}
     <h1 class="header">Create a New Smart Playlist</h1>
-    <form action={{ url_for("new_playlist") }} method="post">
+    <form action={{ url_for("new_playlist_options") }} method="post">
         <input autocomplete="off" class="form-control" name="playlist_name" placeholder="Name" type="text">
         <input type="checkbox" name="playlist_pub" checked data-toggle="toggle">
-        <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Page" type="text">
-        <button type="submit">New Playlist</button>
+        <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Description" type="text">
+        <button type="submit">Next</button>
     </form>
 {% endblock %}

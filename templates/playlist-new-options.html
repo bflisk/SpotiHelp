@@ -1,0 +1,52 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+    New Playlist Options
+{% endblock title %}
+
+{% block body %}
+    <div id="global_prefs" class="prefs big_prefs">
+        <h1>Global Preferences</h1>
+        <input type="text" placeholder="Size" name="size">
+        <input type="text" placeholder="Source(s)" name="source">
+    </div><br>
+
+    <div id="simple_prefs" class="prefs big_prefs">
+        <h1>Simple Preferences</h1>
+        <input type="range" min="0" max="100" value="50" class="slider" name="mood">
+        <input type="range" min="0" max="100" value="50" class="slider" name="vocal">
+        <input type="range" min="0" max="100" value="50" class="slider" name="hype">
+    </div><br>
+
+    <div id="advanced_prefs" class="prefs big_prefs">
+        <h1>Advanced Preferences</h1>
+        <div id="mood" class="prefs small_prefs">
+            <p1>Mood</p1>
+            <input type="checkbox" name="mode" checked data-toggle="toggle">
+            <input type="number" name="key" min="0" max="11">
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="valence">
+        </div><br>
+        
+        <div id="vocal" class="prefs small_prefs">
+            <p1>Vocal</p1>
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="speechiness">
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="instrumentalness">
+        </div><br>
+        
+        <div id="hype" class="prefs small_prefs">
+            <p1>Hype</p1>
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="loudness">
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="energy">
+        </div><br>
+    
+        <div id="other" class="prefs small_prefs">
+            <p1>Other</p1>
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="danceability">  
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="acousticness">
+            <input type="range" min="0" max="1" value="0.500" class="slider" name="liveness">
+            <input type="number" min="10" max="300" name="tempo">
+            <input type="number" min="1" max="1800" name="avg_duration">
+            <input type="number" min="1" max="86400" name="total_duration">
+        </div><br> 
+    </div>      
+{% endblock body %}

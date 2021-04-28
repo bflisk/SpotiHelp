@@ -159,6 +159,7 @@ def redirectPage():
     session["token_info"] = token_info # Saves token info into the the session
     sp = create_sp()
     session["username"] = sp.current_user()['display_name'] # Sets session username
+    #session["user_id"] = generate_password_hash(session["username"],method='pbkdf2:sha256', salt_length=8) # Generate unique id for user
 
     # Checks if the user is registered and adds to database accordingly
     if not db.execute("SELECT * FROM users WHERE username=?", session["username"]):
@@ -220,9 +221,9 @@ def new_playlist():
 
     if request.method == "POST":
         # Gets user's desired new playlist parameters
-        playlist_name = request.form.get("playlist_name")
-        playlist_pub = request.form.get("playlist_pub")
-        playlist_desc = request.form.get("playlist_desc")
+        name = request.form.get("playlist_name")
+        pub = request.form.get("playlist_pub")
+        desc = request.form.get("playlist_desc")
         
         # Parses whether playlis is public or not
         if playlist_pub == 'on':
@@ -231,7 +232,7 @@ def new_playlist():
             playlist_pub = False
 
         # Creates the playlist in the user's library
-        sp.user_playlist_create(session['username'], playlist_name, public=playlist_pub, description=playlist_desc)
+        sp.user_playlist_create(session['username'], name, public=pub, description=desc)
 
         # Gets new playlist information from Spotify
         #sp.playlist
@@ -242,15 +243,64 @@ def new_playlist():
         except:
             playlist_art = ''
 
-        # Adds the new playlist into the database
-        """db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], playlist['id'], playlist['name'], 
-                    playlist_art, playlist['external_urls']['spotify'])
-        """
-
         #return redirect(f"/playlist-edit/{playlist_id}")
         return render_template("playlist-new.html")
     else:
         return render_template("playlist-new.html")
+
+
+# Displays options for the creation of a new smart playlist
+@app.route("/playlist-new/options", methods=["GET", "POST"])
+@login_required
+def new_playlist_options():
+    if request.method == "POST":
+        sp = create_sp() # Creates a new spotify object
+        playlist_options = {} # Initializes the playlist's options
+
+        # Global preferences 
+        size = request.form.get("playlist_size") # Number of songs in playlist
+        source = request.form.get("source") # TODO Source(s) the new playlist pulls from
+
+        # Simple Preferences 
+        playlist_options.update({"mood": request.form.get("mood")})
+        playlist_options.update({"vocal": request.form.get("vocal")})
+        playlist_options.update({"hype": request.form.get("hype")})
+
+        # Advanced Preferences 
+        # Mood
+        playlist_options.update({"mode": request.form.get("mode")}) # (0/1) Mode = Minor/Major
+        playlist_options.update({"key": request.form.get("key")}) # Uses pitch-class notation (e.g. 0 = C, 1 = C#, 2= D)
+        playlist_options.update({"valence": request.form.get("valence")}) # (0-1)'positiveness/happiness' of track
+
+        # Vocal
+        playlist_options.update({"speechiness": request.form.get("speechiness")}) # (0-1) Presence of spoken word (> 0.66 = All spoken word, 0.33 < semi-spoken < 0.66, All instruments < 0.33)
+        playlist_options.update({"instrumentalness": request.form.get("instrumentalness")}) # (0-1) Absence of spoken word (> 0.5 is high confidence)
+
+        # Hype
+        playlist_options.update({"loudness": request.form.get("loudness")}) # (-60 - 0) How loud a track is overall
+        playlist_options.update({"energy": request.form.get("energy")}) # (0-1) Energy brooooo
+        
+        # Other
+        playlist_options.update({"danceability": request.form.get("danceability")}) # (0-1) How easy it is to dance to
+        playlist_options.update({"acousticness": request.form.get("acousticness")}) # (0-1) Confidence of how acoustic a track is
+        playlist_options.update({"liveness": request.form.get("liveness")}) # (0-1) Probability of track being played live
+        playlist_options.update({"tempo": request.form.get("tempo")}) # TODO Find out tempo range
+        playlist_options.update({"avg_duration": request.form.get("avg_duration")}) # Average song duration
+        playlist_options.update({"total_duration": request.form.get("total_duration")}) # Total playlist duration #TODO Create formula for deviation from user specified value
+
+        # TODO Make sure simple and advanced preferences are mutually exclusive
+
+        #return redirect(url_for("new_playlist_create"))
+        return render_template("playlist-new-options.html")
+    else:
+        return render_template("playlist-new-options.html")
+
+
+# Prompts for final options and creates the user-generated smart playlist
+@app.route("/playlist-new/create", methods=["GET", "POST"])
+@login_required
+def new_playlist_create():
+    return render_template("playlist-new-create.html")
 
 
 # Allows the user to edit existing playlists
@@ -294,6 +344,7 @@ def edit_playlist():
     return render_template("playlist-edit.html", playlists=playlists)
 
 
+# Opens up a specific playlist for a user to edit
 @app.route("/playlist-edit/<playlist>")
 @login_required
 def edit_specific_playlist(playlist):
