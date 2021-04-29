@@ -5,48 +5,85 @@
 {% endblock title %}
 
 {% block body %}
-    <div id="global_prefs" class="prefs big_prefs">
+    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#global_prefs" aria-expanded="false" aria-controls="collapseExample">
+        Global Preferences
+    </button>
+    <div id="global_prefs" class="prefs big_prefs collapse">
         <h1>Global Preferences</h1>
         <input type="text" placeholder="Size" name="size">
         <input type="text" placeholder="Source(s)" name="source">
     </div><br>
 
-    <div id="simple_prefs" class="prefs big_prefs">
+    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#simple_prefs" aria-expanded="false" aria-controls="collapseExample">
+        Simple Preferences
+    </button>
+    <div id="simple_prefs" class="prefs big_prefs collapse">
         <h1>Simple Preferences</h1>
+        <label for="mood">Mood:</label>
         <input type="range" min="0" max="100" value="50" class="slider" name="mood">
+        <label for="vocal">Vocal:</label>
         <input type="range" min="0" max="100" value="50" class="slider" name="vocal">
+        <label for="hype">Hype:</label>
         <input type="range" min="0" max="100" value="50" class="slider" name="hype">
     </div><br>
 
-    <div id="advanced_prefs" class="prefs big_prefs">
+    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#advanced_prefs" aria-expanded="false" aria-controls="collapseExample">
+        Advanced Preferences
+    </button>
+    <div id="advanced_prefs" class="prefs big_prefs collapse">
         <h1>Advanced Preferences</h1>
-        <div id="mood" class="prefs small_prefs">
-            <p1>Mood</p1>
-            <input type="checkbox" name="mode" checked data-toggle="toggle">
-            <input type="number" name="key" min="0" max="11">
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="valence">
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#mood" aria-expanded="false" aria-controls="collapseExample">
+            Mood
+        </button>
+        <div id="mood" class="prefs small_prefs collapse">
+            <p1>Mood</p1><br>
+            <label for="mode">Mode:</label>
+            <input type="checkbox" name="mode" id="mode" checked data-toggle="toggle">
+            <label for="key">Key:</label>
+            <input type="number" name="key" id="key" min="0" max="11">
+            <label for="valence">Valence:</label>
+            <input type="range" name="valence" id="valence" min="0" max="1" value="0.500" step="0.001" class="slider">
         </div><br>
         
-        <div id="vocal" class="prefs small_prefs">
-            <p1>Vocal</p1>
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="speechiness">
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="instrumentalness">
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#vocal" aria-expanded="false" aria-controls="collapseExample">
+            Vocal
+        </button>
+        <div id="vocal" class="prefs small_prefs collapse">
+            <p1>Vocal</p1><br>
+            <label for="speechiness">Speechiness:</label>
+            <input type="range" min="0" max="1" value="0.500" step="0.0001" class="slider" name="speechiness"><br>
+            <label for="instrumentalness">Instrumentalness:</label>
+            <input type="range" min="0" max="1" value="0.500" step="0.0001" class="slider" name="instrumentalness"><br>
         </div><br>
         
-        <div id="hype" class="prefs small_prefs">
-            <p1>Hype</p1>
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="loudness">
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="energy">
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#hype" aria-expanded="false" aria-controls="collapseExample">
+            Hype
+        </button>
+        <div id="hype" class="prefs small_prefs collapse">
+            <p1>Hype</p1><br>
+            <label for="loudness">Loudness:</label>
+            <input type="range" min="-60" max="0" value="-30" step="1" class="slider" name="loudness"><br>
+            <label for="energy">Energy:</label>
+            <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="energy"><br>
         </div><br>
-    
-        <div id="other" class="prefs small_prefs">
-            <p1>Other</p1>
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="danceability">  
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="acousticness">
-            <input type="range" min="0" max="1" value="0.500" class="slider" name="liveness">
-            <input type="number" min="10" max="300" name="tempo">
-            <input type="number" min="1" max="1800" name="avg_duration">
-            <input type="number" min="1" max="86400" name="total_duration">
+        
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#other" aria-expanded="false" aria-controls="collapseExample">
+            Other
+        </button>
+        <div id="other" class="prefs small_prefs collapse">
+            <p1>Other</p1><br>
+            <label for="danceability">Danceability:</label>
+            <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="danceability"><br>
+            <label for="acousticness">Acousticness:</label>  
+            <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="acousticness"><br>
+            <label for="liveness">Liveness:</label>
+            <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="liveness"><br>
+            <label for="tempo">Tempo:</label>
+            <input type="number" min="10" max="300" name="tempo"><br>
+            <label for="avg_duration">Average Duration:</label>
+            <input type="number" min="1" max="1800" name="avg_duration"><br>
+            <label for="total_duration">Total Duration:</label>
+            <input type="number" min="1" max="86400" name="total_duration"><br>
         </div><br> 
     </div>      
 {% endblock body %}
