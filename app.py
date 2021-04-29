@@ -218,21 +218,22 @@ def getTracks():
 @login_required
 def new_playlist():
     sp = create_sp() # Creates a new spotify object 
+    playlist_options = {}
 
     if request.method == "POST":
         # Gets user's desired new playlist parameters
-        name = request.form.get("playlist_name")
-        pub = request.form.get("playlist_pub")
-        desc = request.form.get("playlist_desc")
+        playlist_options.update({"name": request.form.get("playlist_name")})
+        playlist_options.update({"public": request.form.get("playlist_pub")})
+        playlist_options.update({"description": request.form.get("playlist_desc")})
         
         # Parses whether playlis is public or not
-        if playlist_pub == 'on':
-            playlist_pub = True
+        if playlist_options['public'] == 'on':
+            playlist_options['public'] = True
         else:
-            playlist_pub = False
+            playlist_options['public'] = False
 
         # Creates the playlist in the user's library
-        sp.user_playlist_create(session['username'], name, public=pub, description=desc)
+        # sp.user_playlist_create(session['username'], name, public=pub, description=desc)
 
         # Gets new playlist information from Spotify
         #sp.playlist
@@ -243,8 +244,9 @@ def new_playlist():
         except:
             playlist_art = ''
 
-        #return redirect(f"/playlist-edit/{playlist_id}")
-        return render_template("playlist-new.html")
+        session['playlist_options'] = playlist_options
+
+        return redirect(url_for("new_playlist_options"))
     else:
         return render_template("playlist-new.html")
 
@@ -255,7 +257,7 @@ def new_playlist():
 def new_playlist_options():
     if request.method == "POST":
         sp = create_sp() # Creates a new spotify object
-        playlist_options = {} # Initializes the playlist's options
+        playlist_options = session['playlist_options']
 
         # Global preferences 
         size = request.form.get("playlist_size") # Number of songs in playlist
@@ -288,10 +290,17 @@ def new_playlist_options():
         playlist_options.update({"avg_duration": request.form.get("avg_duration")}) # Average song duration
         playlist_options.update({"total_duration": request.form.get("total_duration")}) # Total playlist duration #TODO Create formula for deviation from user specified value
 
-        # TODO Make sure simple and advanced preferences are mutually exclusive
+        # Parses whether playlist is major or minor
+        if playlist_options['mode'] == 'on':
+            playlist_options['mode'] = 'Major'
+        else:
+            playlist_options['public'] = 'Minor'
 
-        #return redirect(url_for("new_playlist_create"))
-        return render_template("playlist-new-options.html")
+        # TODO Make sure simple and advanced preferences are mutually exclusive
+        session['playlist_options'] = playlist_options # Stores the new playlist's options in the session
+
+        return redirect(url_for("new_playlist_create"))
+        #return render_template("playlist-new-options.html")
     else:
         return render_template("playlist-new-options.html")
 
@@ -300,7 +309,39 @@ def new_playlist_options():
 @app.route("/playlist-new/create", methods=["GET", "POST"])
 @login_required
 def new_playlist_create():
-    return render_template("playlist-new-create.html")
+    sp = create_sp() # Creates a new spotify object
+    playlist_options = session['playlist_options']
+
+    if request.method == "POST":
+        # Creates a new empty playlist with user parameters
+        sp.user_playlist_create(session['username'], session['playlist_options']['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
+
+        # Fills out playlist with tracks based on user parameters
+        user_tracks = []
+        i = 0
+        batch = sp.current_user_saved_tracks(limit=50, offset=0)
+
+        # Gets all of the user's liked tracks
+        #while batch['items']:
+        while i < 2:
+            for track in batch['items']:
+                user_tracks.append(track)
+
+            i += 1
+            batch = sp.current_user_saved_tracks(limit=50, offset=i*50)
+        print("+++++++++++++++++++++++++++++++++++++++")
+        print(user_tracks)
+        
+        # Loops through the tracks to find ones with similar parameters to what the user wants
+        for track in user_tracks:
+            print("============================================")
+            print(track)
+            anal = sp.audio_analysis(track['items'][0]['id'])
+            print(anal)
+
+        return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
+    else:
+        return render_template("playlist-new-create.html", playlist_options=playlist_options, created=False)
 
 
 # Allows the user to edit existing playlists
@@ -309,10 +350,16 @@ def new_playlist_create():
 def edit_playlist():
     # Gets the user's playlists
     sp = create_sp()
-    playlists = []
+    sp_playlists = []
+    db_playlists = []
+
+    #for j in temp_db:
+    #    db_playlists.append(j['playlist_id'])
         
     # Checks whether the user's playlists have been saved in the database yet and retrieves them
-    if not db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id']):
+    if not db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id']) or request.form.get("refresh"):
+        db.execute("DELETE FROM playlists WHERE user_id=?;", session['username'])
+
         # Gets initial batch of playlists from spotify
         i = 0
         batch = sp.current_user_playlists(limit=50, offset=i*50)['items']
@@ -323,16 +370,17 @@ def edit_playlist():
             # Loops through current batch of playlists and adds user-created playlists into database
             for playlist in batch:
                 if playlist['owner']['id'] == session['username']:
+                    sp_playlists.append(playlist)
 
-                    # Tries to get playlist art
+                    # Tries to get playlist art #TODO Get playlist art every time it loads
                     try:
                         playlist_art = playlist['images'][0]['url']
                     except:
                         playlist_art = ''
 
-                    # Adds playlist into database
+                    # Adds playlist into database, skipping any duplicates
                     db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], playlist['id'], playlist['name'], 
-                              playlist_art, playlist['external_urls']['spotify'])  
+                                playlist_art, playlist['external_urls']['spotify'])
 
             # Continues iterating over all user playlists  
             i += 1

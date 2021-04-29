@@ -8,3 +8,5 @@ SELECT * FROM users;
 
 DELETE FROM playlists WHERE user_id=1;
 DROP TABLE playlists;
+
+END TRANSACTION;

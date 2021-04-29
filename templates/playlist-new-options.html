@@ -5,13 +5,15 @@
 {% endblock title %}
 
 {% block body %}
+<form action={{ url_for('new_playlist_options') }} method="post">
     <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#global_prefs" aria-expanded="false" aria-controls="collapseExample">
         Global Preferences
     </button>
     <div id="global_prefs" class="prefs big_prefs collapse">
         <h1>Global Preferences</h1>
-        <input type="text" placeholder="Size" name="size">
-        <input type="text" placeholder="Source(s)" name="source">
+        <label for="size">Number of songs:</label>
+        <input type="range" min="0" max="1000" value="50" class="slider" name="size">
+        <input type="text" placeholder="Source(s)" name="source" required>
     </div><br>
 
     <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#simple_prefs" aria-expanded="false" aria-controls="collapseExample">
@@ -40,7 +42,7 @@
             <label for="mode">Mode:</label>
             <input type="checkbox" name="mode" id="mode" checked data-toggle="toggle">
             <label for="key">Key:</label>
-            <input type="number" name="key" id="key" min="0" max="11">
+            <input type="number" name="key" id="key" min="0" max="11" required>
             <label for="valence">Valence:</label>
             <input type="range" name="valence" id="valence" min="0" max="1" value="0.500" step="0.001" class="slider">
         </div><br>
@@ -79,11 +81,15 @@
             <label for="liveness">Liveness:</label>
             <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="liveness"><br>
             <label for="tempo">Tempo:</label>
-            <input type="number" min="10" max="300" name="tempo"><br>
+            <input type="number" min="10" max="300" name="tempo" required><br>
             <label for="avg_duration">Average Duration:</label>
-            <input type="number" min="1" max="1800" name="avg_duration"><br>
+            <input type="number" min="1" max="1800" name="avg_duration" required><br>
             <label for="total_duration">Total Duration:</label>
-            <input type="number" min="1" max="86400" name="total_duration"><br>
+            <input type="number" min="1" max="86400" name="total_duration" required><br>
         </div><br> 
-    </div>      
+    </div>
+    
+    
+    <button type="submit">Next</button>
+</form>
 {% endblock body %}

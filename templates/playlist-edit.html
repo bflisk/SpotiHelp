@@ -5,7 +5,13 @@
 {% endblock %}
 
 {% block body %}
-    <h1 class="header">Edit Existing Playlists</h1>
+    <div>
+        <form method="get" action={{ url_for('edit_playlist') }}>
+            <button class="btn" name="refresh">Refresh</button>
+        </form>
+        <h1 class="header">Edit Existing Playlists</h1>
+    </div>
+    
     {% for playlist in playlists %}
         <form action="/playlist-edit/{{ playlist['playlist_id'] }}" method="get">
             <button class="btn" name="playlist" value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</button>

@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+    Create Playlist
+{% endblock title %}
+
+{% block body %}
+    {% if created == False %}
+        {% for option in playlist_options %}
+            <ul>{{ option }} {{ playlist_options[option] }}</ul>
+        {% endfor %}
+
+        <form action={{ url_for("new_playlist_create") }} method="post">
+            <button type="submit">Next</button>
+        </form>
+    {% else %}
+        <h1>Playlist Created!</h1>
+    {% endif %}
+{% endblock body %}
