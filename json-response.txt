@@ -181,3 +181,25 @@
     "previous": null,
     "total": 9
 }
+
+
+== FRICK ==
+
+{'danceability': 0.663, 
+'energy': 0.709, 
+'key': 7, 
+'loudness': -3.834, 
+'mode': 0, 
+'speechiness': 0.0566, 
+'acousticness': 0.000216, 
+'instrumentalness': 0.0156, 
+'liveness': 0.599, 
+'valence': 0.075, 
+'tempo': 127.988, 
+'type': 'audio_features', 
+'id': '07wExbSybe0F6BtQjkjGSw', 
+'uri': 'spotify:track:07wExbSybe0F6BtQjkjGSw', 
+'track_href': 'https://api.spotify.com/v1/tracks/07wExbSybe0F6BtQjkjGSw', 
+'analysis_url': 'https://api.spotify.com/v1/audio-analysis/07wExbSybe0F6BtQjkjGSw', 
+'duration_ms': 263160, 
+'time_signature': 4}

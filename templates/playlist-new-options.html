@@ -13,7 +13,12 @@
         <h1>Global Preferences</h1>
         <label for="size">Number of songs:</label>
         <input type="range" min="0" max="1000" value="50" class="slider" name="size">
-        <input type="text" placeholder="Source(s)" name="source" required>
+        <select name="source" id="playlist_source" required>
+            <option value="default" selected disabled>Pick a Source</option>
+            {% for playlist in playlists %}
+                <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
+            {% endfor %}
+        </select>
     </div><br>
 
     <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#simple_prefs" aria-expanded="false" aria-controls="collapseExample">

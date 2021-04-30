@@ -9,7 +9,7 @@
     <form action={{ url_for("new_playlist") }} method="post">
         <input autocomplete="off" class="form-control" name="playlist_name" placeholder="Name" type="text" required>
         <input type="checkbox" name="playlist_pub" checked data-toggle="toggle">
-        <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Description" type="text" required>
+        <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Description" type="text">
         <button type="submit">Next</button>
     </form>
 {% endblock %}
