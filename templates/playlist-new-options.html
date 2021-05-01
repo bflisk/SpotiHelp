@@ -15,6 +15,7 @@
         <input type="range" min="0" max="1000" value="50" class="slider" name="size">
         <select name="source" id="playlist_source" required>
             <option value="default" selected disabled>Pick a Source</option>
+            <option value="liked songs">Liked Songs</option>
             {% for playlist in playlists %}
                 <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
             {% endfor %}

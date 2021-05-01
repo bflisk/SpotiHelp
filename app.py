@@ -320,10 +320,11 @@ def new_playlist_options():
     if request.method == "POST":
         sp = create_sp() # Creates a new spotify object
         playlist_options = session['playlist_options']
+        playlist_options.update({'source': []}) # Initializes the list of sources the user wants to pull songs from
 
         # Global preferences 
         playlist_options.update({"size": request.form.get("playlist_size")}) # Number of songs in playlist
-        playlist_options.update({"source": request.form.get("source")}) # Outputs the playlist ID
+        playlist_options['source'].append(request.form.get("source")) # Outputs the playlist ID
 
         # Simple Preferences 
         playlist_options.update({"mood": request.form.get("mood")})
@@ -385,8 +386,9 @@ def new_playlist_create():
         total_tracks = [] # Tracks from every source the user specified
         total_tracks_sifted = [] # Total tracks that match user parameters
 
-        # Gets all of the user's liked tracks
+        # If the user specifies their liked tracks
         if 'liked songs' in playlist_options['source']:
+            # Gets all of the user's liked tracks
             batch = sp.current_user_saved_tracks(limit=50, offset=0)['items']
             batchIterator = 0
 
@@ -397,16 +399,24 @@ def new_playlist_create():
                 batchIterator += 1
                 batch = sp.current_user_saved_tracks(limit=50, offset=batchIterator*50)['items']
         
-        # Gets the tracks off of a specific playlist
-        batch = sp.playlist_tracks(playlist_options['source'], limit=100, offset=0)['items']
-        batchIterator = 0
+        print("[][][][][][][][][][][][][][][][][][][][][][][][]")
+        print(len(playlist_options['source']))
+        print(playlist_options['source'])
+        print("[][][][][][][][][][][][][][][][][][][][][][][][]")
 
-        while batch:
-            for track in batch:
-                total_tracks.append(track)
+        # If the user specifies a playlist
+        # TODO Add functionality for multiple playlists to act as sources
+        if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source']:
+            # Gets the tracks off of a specific playlist
+            batch = sp.playlist_tracks(playlist_options['source'][0], limit=100, offset=0)['items']
+            batchIterator = 0
 
-            batchIterator += 1
-            batch = sp.playlist_tracks(playlist_options['source'], limit=100, offset=batchIterator*100)['items']
+            while batch:
+                for track in batch:
+                    total_tracks.append(track)
+
+                batchIterator += 1
+                batch = sp.playlist_tracks(playlist_options['source'][0], limit=100, offset=batchIterator*100)['items']
     
         # Gets tracks with user parameters
         batch = []
@@ -418,7 +428,7 @@ def new_playlist_create():
                 batch.append(track['track']['id'])
             batchIterator += 1
 
-            if batchIterator == 100 and batch != None:
+            if batchIterator % 100 == 0 and batch != None:
                 track_features = sp.audio_features(tracks=batch)
                 batchIterator = 0
                 batch = []
@@ -428,6 +438,12 @@ def new_playlist_create():
                     if int(track_feature['key']) == int(playlist_options['key']):
                         total_tracks_sifted.append(track_feature['id'])
         
+        # Gets last track features (< 100)
+        track_features = sp.audio_features(tracks=batch)
+        for track_feature in track_features:
+            if int(track_feature['key']) == int(playlist_options['key']):
+                total_tracks_sifted.append(track_feature['id'])
+
         # Adds tracks to playlist
         batch = []
 
@@ -435,9 +451,12 @@ def new_playlist_create():
             batch.append(total_tracks_sifted[batchIterator])
             batchIterator += 1 
 
-            if batchIterator == 100:
+            if batchIterator % 100 == 0:
                 sp.user_playlist_add_tracks(session['username'], sp.current_user_playlists(limit=1, offset=0)['items'][0]['id'], batch, position=None)
                 batch = []
+        
+        # Adds remaining tracks (< 100)
+        sp.user_playlist_add_tracks(session['username'], sp.current_user_playlists(limit=1, offset=0)['items'][0]['id'], batch, position=None)
 
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
     else:
