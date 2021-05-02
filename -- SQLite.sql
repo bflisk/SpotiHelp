@@ -13,3 +13,5 @@ DROP TABLE playlists;
 END TRANSACTION;
 
 CREATE INDEX playlists_options ON #FINISH THIS;
+
+SELECT * FROM playlists WHERE playlist_id='25gN2E1Lbg6tUAvSyScmlt';

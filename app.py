@@ -171,6 +171,63 @@ def get_artwork():
     
     return playlist_art
 
+
+# Sifts through songs to get ones with user parameters
+# TODO add weights to each comparison to gradually widen parameters if there are not enough tracks to add
+def sift_tracks(track_feature, playlist_options):
+    # Mood
+    mode = int(track_feature['mode']) == int(playlist_options['mode']) # (0/1) Mode = Minor/Major
+    key = int(track_feature['key']) == int(playlist_options['key']) # Uses pitch-class notation (e.g. 0 = C, 1 = C#, 2= D)
+    valence = abs(track_feature['valence'] - float(playlist_options['valence'])) < 0.5 # (0-1)'positiveness/happiness' of track
+
+    # Vocal
+    speechiness = abs(track_feature['speechiness'] - float(playlist_options['speechiness'])) < 0.5 # (0-1) Presence of spoken word (> 0.66 = All spoken word, 0.33 < semi-spoken < 0.66, All instruments < 0.33)
+    instrumentalness = abs(track_feature['instrumentalness'] - float(playlist_options['instrumentalness'])) < 0.5 # (0-1) Absence of spoken word (> 0.5 is high confidence)
+
+    # Hype
+    loudness = abs(track_feature['loudness'] - float(playlist_options['loudness'])) < 20 # (-60 - 0) How loud a track is overall
+    energy = abs(track_feature['energy'] - float(playlist_options['energy'])) < 0.5 # (0-1) Energy brooooo
+    
+    # Other
+    danceability = abs(track_feature['danceability'] - float(playlist_options['danceability'])) < 0.5 # (0-1) How easy it is to dance to
+    acousticness = abs(track_feature['acousticness'] - float(playlist_options['acousticness'])) < 0.5 # (0-1) Confidence of how acoustic a track is
+    liveness = abs(track_feature['liveness'] - float(playlist_options['liveness'])) < 0.5 # (0-1) Probability of track being played live
+    tempo = abs(track_feature['tempo'] - float(playlist_options['tempo'])) < 20
+    """danceability = True
+    acousticness = True
+    liveness = True
+    tempo = True"""
+
+    # Checks if every parameter is met and returns true or false
+    allow = bool(mode * key * valence * speechiness * instrumentalness * loudness * energy * danceability * acousticness * liveness * tempo)
+    return allow
+
+
+# Calculates values for spotify from the "Simple options"
+def calculate_advanced(simple_options):
+    mood = int(simple_options[0])
+    vocal = int(simple_options[1])
+    hype = int(simple_options[2])
+
+    # Calculates values based on "mood"
+    if mood > 50:
+        session['playlist_options']['mode'] = 1
+    else:
+        session['playlist_options']['mode'] = 0
+
+    session['playlist_options']['valence'] = mood * 0.01
+
+    # Calculates values based on "vocal"
+    session['playlist_options']['speechiness'] = vocal * 0.01
+    session['playlist_options']['instrumentalness'] = 1 - (vocal * 0.01)
+
+    # Calculates values based on "hype"
+    session['playlist_options']['loudness'] = hype * 0.01
+    session['playlist_options']['energy'] = hype * 0.01
+
+    return
+
+
 # --- Routable functions ---
 
 # Has the user log in and authorize SpotiHelp to use information from Spotify
@@ -227,6 +284,11 @@ def redirectPage():
     session["user_id"] = db.execute("SELECT id FROM users WHERE username=?", session["username"])[0]['id'] # Sets session user id
         
     return redirect(url_for("index", _external=True))
+
+
+@app.route("/error")
+def error():
+    return render_template("error.html")
 
 
 # Logs user out
@@ -382,9 +444,15 @@ def new_playlist_create():
 
     if request.method == "POST":
         # Creates a new empty playlist with user parameters
-        sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
+        new_playlist = sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
+        
         total_tracks = [] # Tracks from every source the user specified
         total_tracks_sifted = [] # Total tracks that match user parameters
+
+        # If the user used simple options instead of advanced options
+        if playlist_options['mood'] != None:
+            calculate_advanced([playlist_options['mood'], playlist_options['vocal'], playlist_options['hype']])
+            playlist_options = session['playlist_options']
 
         # If the user specifies their liked tracks
         if 'liked songs' in playlist_options['source']:
@@ -398,25 +466,21 @@ def new_playlist_create():
 
                 batchIterator += 1
                 batch = sp.current_user_saved_tracks(limit=50, offset=batchIterator*50)['items']
-        
-        print("[][][][][][][][][][][][][][][][][][][][][][][][]")
-        print(len(playlist_options['source']))
-        print(playlist_options['source'])
-        print("[][][][][][][][][][][][][][][][][][][][][][][][]")
 
         # If the user specifies a playlist
-        # TODO Add functionality for multiple playlists to act as sources
         if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source']:
-            # Gets the tracks off of a specific playlist
-            batch = sp.playlist_tracks(playlist_options['source'][0], limit=100, offset=0)['items']
-            batchIterator = 0
+            for playlist_source in playlist_options['source']:
+                if playlist_source != "liked songs":
+                    # Gets the tracks off of a specific playlist
+                    batch = sp.playlist_tracks(playlist_source, limit=100, offset=0)['items']
+                    batchIterator = 0
 
-            while batch:
-                for track in batch:
-                    total_tracks.append(track)
+                    while batch:
+                        for track in batch:
+                            total_tracks.append(track)
 
-                batchIterator += 1
-                batch = sp.playlist_tracks(playlist_options['source'][0], limit=100, offset=batchIterator*100)['items']
+                        batchIterator += 1
+                        batch = sp.playlist_tracks(playlist_source, limit=100, offset=batchIterator*100)['items']
     
         # Gets tracks with user parameters
         batch = []
@@ -435,13 +499,13 @@ def new_playlist_create():
 
                 # Loops through audio features and adds tracks that match user parameters
                 for track_feature in track_features:
-                    if int(track_feature['key']) == int(playlist_options['key']):
+                    if sift_tracks(track_feature, playlist_options):
                         total_tracks_sifted.append(track_feature['id'])
         
         # Gets last track features (< 100)
         track_features = sp.audio_features(tracks=batch)
         for track_feature in track_features:
-            if int(track_feature['key']) == int(playlist_options['key']):
+            if sift_tracks(track_feature, playlist_options):
                 total_tracks_sifted.append(track_feature['id'])
 
         # Adds tracks to playlist
@@ -452,14 +516,20 @@ def new_playlist_create():
             batchIterator += 1 
 
             if batchIterator % 100 == 0:
-                sp.user_playlist_add_tracks(session['username'], sp.current_user_playlists(limit=1, offset=0)['items'][0]['id'], batch, position=None)
+                sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
                 batch = []
         
         # Adds remaining tracks (< 100)
-        sp.user_playlist_add_tracks(session['username'], sp.current_user_playlists(limit=1, offset=0)['items'][0]['id'], batch, position=None)
-
+        if len(batch) > 0:
+            sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
+        
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
     else:
+        # If the user used simple options instead of advanced options
+        if playlist_options['mood'] != None:
+            calculate_advanced([playlist_options['mood'], playlist_options['vocal'], playlist_options['hype']])
+            playlist_options = session['playlist_options']
+
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=False)
 
 

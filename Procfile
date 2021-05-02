@@ -1,1 +1,1 @@
-web: python3 app.py
+waitress-serve app:app
