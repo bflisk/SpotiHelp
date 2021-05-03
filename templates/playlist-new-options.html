@@ -12,9 +12,14 @@
     <div id="global_prefs" class="prefs big_prefs collapse">
         <h1>Global Preferences</h1>
         <label for="size">Number of songs:</label>
-        <input type="range" min="0" max="1000" value="50" class="slider" name="size">
+        <input type="range" min="0" max="500" value="50" class="slider" name="size">
+        <label for="fill">Fill:</label>
+        <input type="checkbox" name="fill" id="fill" checked data-toggle="toggle">
+        <label for="strict">Strict:</label>
+        <input type="checkbox" name="strict" id="strict" checked data-toggle="toggle">
         <select name="source" id="playlist_source" required>
             <option value="default" selected disabled>Pick a Source</option>
+            <option value="spotify">Spotify (No Playlists)</option>
             <option value="liked songs">Liked Songs</option>
             {% for playlist in playlists %}
                 <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
@@ -46,9 +51,11 @@
         <div id="mood" class="prefs small_prefs collapse">
             <p1>Mood</p1><br>
             <label for="mode">Mode:</label>
-            <input type="radio" id="none" name="mode" value="0">
+            <!--input type="radio" id="none" name="mode" value="0"-->
             <input type="checkbox" name="mode" id="mode" checked data-toggle="toggle">
             <label for="key">Key:</label>
+            <input type="number" name="key" id="key" min="0" max="11" required>
+            <input type="number" name="key" id="key" min="0" max="11" required>
             <input type="number" name="key" id="key" min="0" max="11" required>
             <label for="valence">Valence:</label>
             <input type="range" name="valence" id="valence" min="0" max="1" value="0.500" step="0.001" class="slider">
