@@ -152,8 +152,6 @@ def get_playlists():
         # Loops through playlist ID's
         for playlist in sp_playlists:
             playlist_info = sp.playlist(playlist) # Gets information about playlist from spotify
-            print("++++++++++++++++++++++++++++++++++")
-            print(playlist_info)
             db.execute("INSERT INTO playlists VALUES (?,?,?,?,?)", session['user_id'], playlist_info['id'], playlist_info['name'], playlist_info['external_urls']['spotify'], 0) # Inserts playlist into database
 
     playlists = db.execute("SELECT * FROM playlists WHERE user_id=?;", session['user_id']) # Gets updated list of playlists from database
