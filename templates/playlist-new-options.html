@@ -12,7 +12,8 @@
     <div id="global_prefs" class="prefs big_prefs collapse">
         <h1>Global Preferences</h1>
         <label for="size">Number of songs:</label>
-        <input type="range" min="0" max="500" value="50" class="slider" name="size">
+        <!--input type="range" min="0" max="500" value="50" class="slider" name="size"-->
+        <input type="number" name="size" id="size" min="0" max="999" required>
         <label for="fill">Fill:</label>
         <input type="checkbox" name="fill" id="fill" checked data-toggle="toggle">
         <label for="strict">Strict:</label>

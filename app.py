@@ -12,6 +12,7 @@ import time
 import spotipy
 import spotipy.util as util
 
+from random import randrange
 from cs50 import SQL
 from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
 from flask_session import Session
@@ -217,9 +218,70 @@ def widen_parms():
     return parm_change_amount
 
 
+# Gets minimum/maximum value for an option
+def get_bound(option, change):
+    bound = {}
+
+    # Calculates bounds based on user-defined parameter
+    bound.update({'min': (float(session['playlist_options'][option]) - (change/2))})
+    bound.update({'max': (float(session['playlist_options'][option]) + (change/2))})
+
+    # Makes sure that the bounds are valid
+    if option == 'loudness':
+        if bound['min'] < -60:
+            bound['min'] = -60
+        elif bound['max'] > 0:
+            bound['max'] = 0
+    elif option == 'tempo':
+        if bound['min'] < 10:
+            bound['min'] = 10
+        elif bound['max'] > 300:
+            bound['max'] = 300
+    else:
+        if bound['min'] < 0:
+            bound['mid'] = 0
+        elif bound['max'] < 1:
+            bound['max'] = 1
+
+    return bound
+
+
 # TODO Gets additional songs from Spotify
-def seed_tracks():
-    tracks = recommendations(seed_artist=None, seed_genres=session['playlist_options']['genres'], seed_tracks=None, limit=limit, country=None, min_acousticness=)
+# TODO Add functionality to search fo multiple keys
+# TODO Add functionality for min_duration_ms & max_duration_ms
+def seed_tracks(limit, genres, tracks):
+    sp = create_sp()
+    playlist_options = session['playlist_options']
+    change = session['playlist_options']['change']
+    tracks = []
+
+    # If the user did not specify a change, sets it to zero
+    for i in change:
+        if not change[i]:
+            change[i] = 0.4
+    
+    # If the user did not specify a mode, allows Spotify to search for any mode
+    if not playlist_options['mode']:
+        mode = [0, 1]
+    else:
+        mode = [playlist_options['mode'], playlist_options['mode']]
+
+    # Fetches tracks from Spotify's recommendation system that match user parameters
+    batch = sp.recommendations(seed_artists=None, seed_genres=genres, seed_tracks=tracks, limit=limit, country=None, 
+        target_key=playlist_options['key'][0], 
+        min_mode=mode[0], max_mode=mode[1], 
+        target_valence=playlist_options['valence'], min_valence=get_bound('valence', change['valence'])['min'], max_valence=get_bound('valence', change['valence'])['max'], 
+        target_speechiness=playlist_options['speechiness'], min_speechiness=get_bound('speechiness', change['speechiness'])['min'], max_speechiness=get_bound('speechiness', change['speechiness'])['max'], 
+        target_instrumentalness=playlist_options['instrumentalness'], min_instrumentalness=get_bound('instrumentalness', change['instrumentalness'])['min'], max_instrumentalness=get_bound('instrumentalness', change['instrumentalness'])['max'], 
+        target_loudness=playlist_options['loudness'], min_loudness=get_bound('loudness', change['loudness'])['min'], max_loudness=get_bound('loudness', change['loudness'])['max'], 
+        target_energy=playlist_options['energy'], min_energy=get_bound('energy', change['energy'])['min'], max_energy=get_bound('energy', change['energy'])['max'], 
+        target_danceability=playlist_options['danceability'], min_danceability=get_bound('danceability', change['danceability'])['min'], max_danceability=get_bound('danceability', change['danceability'])['max'], 
+        target_acousticness=playlist_options['acousticness'], min_acousticness=get_bound('acousticness', change['acousticness'])['min'], max_acousticness=get_bound('acousticness', change['acousticness'])['max'], 
+        target_liveness=playlist_options['liveness'], min_liveness=get_bound('liveness', change['liveness'])['min'], max_liveness=get_bound('liveness', change['liveness'])['max'], 
+        target_tempo=playlist_options['tempo'], min_tempo=get_bound('tempo', change['tempo'])['min'], max_tempo=get_bound('tempo', change['tempo'])['max'])
+
+    for track in batch:
+        tracks.append(track['id'])
 
     return tracks
 
@@ -372,6 +434,8 @@ def new_playlist():
 
 
 # Displays options for the creation of a new smart playlist
+# TODO Allow user to choose popularity of songs (Only if the source is Spotify)
+# TODO Maybe allow user to use a set of artists or songs to seed a playlist
 @app.route("/playlist-new/options", methods=["GET", "POST"])
 @login_required
 def new_playlist_options():
@@ -379,53 +443,57 @@ def new_playlist_options():
         sp = create_sp() # Creates a new spotify object
         playlist_options = session["playlist_options"]
         playlist_options.update({"source": []}) # Initializes the list of sources the user wants to pull songs from
-        playlist_options.update({"size_change": {}}) # Initializes the changes in options if not enough songs are added to the playlist
+        playlist_options.update({"change": {}}) # Initializes the changes in options if not enough songs are added to the playlist
         playlist_options.update({"key": []}) # Stores the keys the user wants tracks to be in
-        playlist_options.update({"genre": []}) # Sotres a list of genres the user wants to pull from
+        #playlist_options.update({"genre": []}) # Sotres a list of genres the user wants to pull from
+
+        # TODO TESTING TESTING TESTING TESTING
+        playlist_options['genre'] = []
+        playlist_options['genre'].append('dubstep')
 
         # Global preferences 
-        playlist_options.update({"size": request.form.get("playlist_size")}) # Number of songs in playlist
+        playlist_options.update({"size": int(request.form.get("size"))}) # Number of songs in playlist
         playlist_options["source"].append(request.form.get("source")) # Outputs the playlist ID
         playlist_options.update({"fill": request.form.get("fill")}) # Fills playlist with tracks from Spotify if user's sources don't have enough songs
         playlist_options.update({"strict": request.form.get("strict")}) # If true, widens search parameters if the user does not have enough songs in their library
-        playlist_options["genre"].append(request.form.get("genre"))
+        # TODO playlist_options["genre"].append(request.form.get("genre"))
 
         # Simple Preferences 
         playlist_options.update({"mood": request.form.get("mood")})
-        playlist_options["size_change"].update({"mood_change": request.form.get("mood_change")})
+        playlist_options["change"].update({"mood": request.form.get("mood_change")})
         playlist_options.update({"vocal": request.form.get("vocal")})
-        playlist_options["size_change"].update({"vocal_change": request.form.get("vocal_change")})
+        playlist_options["change"].update({"vocal": request.form.get("vocal_change")})      
         playlist_options.update({"hype": request.form.get("hype")})
-        playlist_options["size_change"].update({"hype_change": request.form.get("hype_change")})
+        playlist_options["change"].update({"hype": request.form.get("hype_change")})
 
         # Advanced Preferences 
         # Mood
         playlist_options.update({"mode": request.form.get("mode")}) # (0/1) Mode = Minor/Major
         playlist_options["key"].append(request.form.get("key")) # Uses pitch-class notation (e.g. 0 = C, 1 = C#, 2= D)
         playlist_options.update({"valence": request.form.get("valence")}) # (0-1)'positiveness/happiness' of track
-        playlist_options["size_change"].update({"mode_change": request.form.get("mode_change")})
+        playlist_options["change"].update({"valence": request.form.get("valence_change")})
 
         # Vocal
         playlist_options.update({"speechiness": request.form.get("speechiness")}) # (0-1) Presence of spoken word (> 0.66 = All spoken word, 0.33 < semi-spoken < 0.66, All instruments < 0.33)
-        playlist_options["size_change"].update({"speechiness_change": request.form.get("speechiness_change")})
+        playlist_options["change"].update({"speechiness": request.form.get("speechiness_change")})
         playlist_options.update({"instrumentalness": request.form.get("instrumentalness")}) # (0-1) Absence of spoken word (> 0.5 is high confidence)
-        playlist_options["size_change"].update({"instrumentalness_change": request.form.get("instrumentalness_change")})
+        playlist_options["change"].update({"instrumentalness": request.form.get("instrumentalness_change")})
 
         # Hype
         playlist_options.update({"loudness": request.form.get("loudness")}) # (-60 - 0) How loud a track is overall
-        playlist_options["size_change"].update({"loudness_change": request.form.get("loudness_change")})
+        playlist_options["change"].update({"loudness": request.form.get("loudness_change")})
         playlist_options.update({"energy": request.form.get("energy")}) # (0-1) Energy brooooo
-        playlist_options["size_change"].update({"energy_change": request.form.get("energy_change")})
+        playlist_options["change"].update({"energy": request.form.get("energy_change")})
         
         # Other
         playlist_options.update({"danceability": request.form.get("danceability")}) # (0-1) How easy it is to dance to
-        playlist_options["size_change"].update({"danceability_change": request.form.get("danceability_change")})
+        playlist_options["change"].update({"danceability": request.form.get("danceability_change")})
         playlist_options.update({"acousticness": request.form.get("acousticness")}) # (0-1) Confidence of how acoustic a track is
-        playlist_options["size_change"].update({"acousticness_change": request.form.get("acousticness_change")})
+        playlist_options["change"].update({"acousticness": request.form.get("acousticness_change")})
         playlist_options.update({"liveness": request.form.get("liveness")}) # (0-1) Probability of track being played live
-        playlist_options["size_change"].update({"liveness_change": request.form.get("liveness_change")})
+        playlist_options["change"].update({"liveness": request.form.get("liveness_change")})
         playlist_options.update({"tempo": request.form.get("tempo")}) # TODO Find out tempo range
-        playlist_options["size_change"].update({"tempo_change": request.form.get("tempo_change")})
+        playlist_options["change"].update({"tempo": request.form.get("tempo_change")})
         playlist_options.update({"avg_duration": request.form.get("avg_duration")}) # Average song duration
         playlist_options.update({"total_duration": request.form.get("total_duration")}) # Total playlist duration #TODO Create formula for deviation from user specified value
 
@@ -434,6 +502,12 @@ def new_playlist_options():
             playlist_options['mode'] = 1
         else:
             playlist_options['mode'] = 0
+
+        # Parses HTML into the correct format
+        if playlist_options['fill'] == 'on':
+            playlist_options['fill'] = True
+        else:
+            playlist_options['fill'] = False
 
         # TODO Make sure simple and advanced preferences are mutually exclusive
         session['playlist_options'] = playlist_options # Stores the new playlist's options in the session
@@ -515,14 +589,34 @@ def new_playlist_create():
                 for track_feature in track_features:
                     if sift_tracks(track_feature, playlist_options):
                         total_tracks_sifted.append(track_feature['id'])
-        
+
         # Checks that the number of tracks equals the playlist size the user specified
-        """if len(total_tracks_sifted) > playlist_options['size']:
-            # Cut out extra tracks
-            pass
-        elif len(total_tracks_sifted) < playlist_options['size'] and playlist_options['fill']:
-            # Add more tracks from Spotify's servers
-            pass"""
+        if len(total_tracks_sifted) > int(playlist_options['size']):
+            limit = len(total_tracks_sifted) - int(playlist_options['size']) # Number of tracks needed to delete from the playlist
+
+            # Removes tracks from the list at random until it hits the desired playlist size
+            for i in range(limit):
+                total_tracks_sifted.pop(randrange(len(total_tracks_sifted)))
+
+        elif len(total_tracks_sifted) < int(playlist_options['size']) and playlist_options['fill']:
+            limit = int(playlist_options['size']) - len(total_tracks_sifted) # Number of tracks needed to fill the playlist
+            remaining = limit
+            seeds = {'genre': playlist_options['genre'], 'tracks': []} # Seeds used to get similar tracks from Spotify
+
+            # Randomly chooses tracks to seed (Makes sure there are 5 total seed sources)
+            if len(total_tracks_sifted) >= (5 - len(seeds['genre'])):   
+                for i in range(5 - len(seeds['genre'])):
+                    seeds['tracks'].append(total_tracks_sifted[randrange(len(total_tracks_sifted))])
+
+            # Seeds tracks in batches of 100
+            for i in range(limit):
+                if i % 100 == 0:
+                    total_tracks_sifted.append(seed_tracks(100, seeds['genre'], seeds['tracks']))
+                    remaining -= 100
+
+            # Seeds remaining tracks
+            if remaining > 0:
+                total_tracks_sifted.append(seed_tracks(remaining))
 
         # Gets last track features (< 100)
         track_features = sp.audio_features(tracks=batch)
