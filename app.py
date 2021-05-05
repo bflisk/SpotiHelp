@@ -85,6 +85,8 @@ def get_token():
     if is_expired:
         sp_oauth = create_spotify_oauth() 
         token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+    
+    session['token_info'] = token_info
 
     return token_info
 
@@ -226,6 +228,10 @@ def get_bound(option, change):
     bound.update({'min': (float(session['playlist_options'][option]) - (change/2))})
     bound.update({'max': (float(session['playlist_options'][option]) + (change/2))})
 
+    # Rounds values to acceptable levels
+    bound['min'] = round(bound['min'], 3)
+    bound['max'] = round(bound['max'], 3)
+
     # Makes sure that the bounds are valid
     if option == 'loudness':
         if bound['min'] < -60:
@@ -240,7 +246,7 @@ def get_bound(option, change):
     else:
         if bound['min'] < 0:
             bound['mid'] = 0
-        elif bound['max'] < 1:
+        elif bound['max'] > 1:
             bound['max'] = 1
 
     return bound
@@ -249,11 +255,16 @@ def get_bound(option, change):
 # TODO Gets additional songs from Spotify
 # TODO Add functionality to search fo multiple keys
 # TODO Add functionality for min_duration_ms & max_duration_ms
-def seed_tracks(limit, genres, tracks):
+def seed_more_tracks(limit, seed_genres, seed_tracks):
     sp = create_sp()
     playlist_options = session['playlist_options']
     change = session['playlist_options']['change']
     tracks = []
+
+    if seed_genres == []:
+        seed_genres = None
+    elif seed_tracks == []:
+        seed_tracks = None
 
     # If the user did not specify a change, sets it to zero
     for i in change:
@@ -267,7 +278,7 @@ def seed_tracks(limit, genres, tracks):
         mode = [playlist_options['mode'], playlist_options['mode']]
 
     # Fetches tracks from Spotify's recommendation system that match user parameters
-    batch = sp.recommendations(seed_artists=None, seed_genres=genres, seed_tracks=tracks, limit=limit, country=None, 
+    batch = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=None, limit=limit, country=None, 
         target_key=playlist_options['key'][0], 
         min_mode=mode[0], max_mode=mode[1], 
         target_valence=playlist_options['valence'], min_valence=get_bound('valence', change['valence'])['min'], max_valence=get_bound('valence', change['valence'])['max'], 
@@ -278,10 +289,16 @@ def seed_tracks(limit, genres, tracks):
         target_danceability=playlist_options['danceability'], min_danceability=get_bound('danceability', change['danceability'])['min'], max_danceability=get_bound('danceability', change['danceability'])['max'], 
         target_acousticness=playlist_options['acousticness'], min_acousticness=get_bound('acousticness', change['acousticness'])['min'], max_acousticness=get_bound('acousticness', change['acousticness'])['max'], 
         target_liveness=playlist_options['liveness'], min_liveness=get_bound('liveness', change['liveness'])['min'], max_liveness=get_bound('liveness', change['liveness'])['max'], 
-        target_tempo=playlist_options['tempo'], min_tempo=get_bound('tempo', change['tempo'])['min'], max_tempo=get_bound('tempo', change['tempo'])['max'])
+        target_tempo=playlist_options['tempo'], min_tempo=get_bound('tempo', change['tempo'])['min'], max_tempo=get_bound('tempo', change['tempo'])['max'])['tracks']['audio_features']
+
+    print("==================================================")
+    print(batch)
+    print("==================================================")
 
     for track in batch:
         tracks.append(track['id'])
+        print(track)
+        print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 
     return tracks
 
@@ -607,16 +624,20 @@ def new_playlist_create():
             if len(total_tracks_sifted) >= (5 - len(seeds['genre'])):   
                 for i in range(5 - len(seeds['genre'])):
                     seeds['tracks'].append(total_tracks_sifted[randrange(len(total_tracks_sifted))])
+            
+            print("[][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]")
+            print(seeds)
+            print("[][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]")
 
             # Seeds tracks in batches of 100
             for i in range(limit):
                 if i % 100 == 0:
-                    total_tracks_sifted.append(seed_tracks(100, seeds['genre'], seeds['tracks']))
+                    total_tracks_sifted.append(seed_more_tracks(100, seeds['genre'], seeds['tracks']))
                     remaining -= 100
 
             # Seeds remaining tracks
             if remaining > 0:
-                total_tracks_sifted.append(seed_tracks(remaining))
+                total_tracks_sifted.append(seed_more_tracks(remaining))
 
         # Gets last track features (< 100)
         track_features = sp.audio_features(tracks=batch)
