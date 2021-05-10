@@ -6,40 +6,42 @@
 
 {% block body %}
 <form action={{ url_for('new_playlist_options') }} method="post">
-    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#global_prefs" aria-expanded="false" aria-controls="collapseExample">
+    <!--button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#global_prefs" aria-expanded="false" aria-controls="collapseExample">
         Global Preferences
-    </button>
-    <div id="global_prefs" class="prefs big_prefs collapse">
-        <h1>Global Preferences</h1>
-        <label for="size">Number of songs:</label>
-        <input type="number" name="size" id="size" min="0" max="999" required>
-        <label for="fill">Fill:</label>
-        <input type="checkbox" name="fill" id="fill" checked data-toggle="toggle">
-        <label for="strict">Strict:</label>
-        <input type="checkbox" name="strict" id="strict" checked data-toggle="toggle">
-        <input autocomplete="off" class="form-control" name="genre" placeholder="genre(s)" type="text">
-        <select name="source" id="playlist_source" required>
-            <option value="default" selected disabled>Pick a Source</option>
-            <option value="spotify">Spotify (No Playlists)</option>
-            <option value="liked songs">Liked Songs</option>
-            {% for playlist in playlists %}
-                <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
-            {% endfor %}
-        </select>
-    </div><br>
+    </button-->
+    <div id="all_prefs" class="mb-3">
+        <div id="global_prefs" class="mb-3">
+            <h1>Global Preferences</h1>
+            <label for="size">Number of songs:</label>
+            <input type="number" name="size" id="size" class="form-control" min="0" max="999" required>
+            <label for="fill">Fill:</label>
+            <input type="checkbox" name="fill" id="fill" class="form-control" checked data-toggle="toggle">
+            <label for="strict">Strict:</label>
+            <input type="checkbox" name="strict" id="strict" class="form-control" checked data-toggle="toggle">
+            <input autocomplete="off" class="form-control" name="genre" placeholder="genre(s)" type="text">
+            <select name="source" id="playlist_source" required>
+                <option value="default" selected disabled>Pick a Source</option>
+                <option value="spotify">Spotify (No Playlists)</option>
+                <option value="liked songs">Liked Songs</option>
+                {% for playlist in playlists %}
+                    <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
+                {% endfor %}
+            </select>
+        </div><br>
 
-    <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#simple_prefs" aria-expanded="false" aria-controls="collapseExample">
-        Simple Preferences
-    </button>
-    <div id="simple_prefs" class="prefs big_prefs collapse">
-        <h1>Simple Preferences</h1>
-        <label for="mood">Mood:</label>
-        <input type="range" min="0" max="100" value="50" class="slider" name="mood">
-        <label for="vocal">Vocal:</label>
-        <input type="range" min="0" max="100" value="50" class="slider" name="vocal">
-        <label for="hype">Hype:</label>
-        <input type="range" min="0" max="100" value="50" class="slider" name="hype">
-    </div><br>
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#simple_prefs" aria-expanded="false" aria-controls="collapseExample">
+            Simple Preferences
+        </button>
+        <div id="simple_prefs" class="prefs big_prefs collapse">
+            <h1>Simple Preferences</h1>
+            <label for="mood">Mood:</label>
+            <input type="range" min="0" max="100" value="50" class="slider" name="mood">
+            <label for="vocal">Vocal:</label>
+            <input type="range" min="0" max="100" value="50" class="slider" name="vocal">
+            <label for="hype">Hype:</label>
+            <input type="range" min="0" max="100" value="50" class="slider" name="hype">
+        </div><br>
+    </div>
 
     <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#advanced_prefs" aria-expanded="false" aria-controls="collapseExample">
         Advanced Preferences
