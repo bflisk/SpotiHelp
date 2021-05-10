@@ -18,7 +18,12 @@
             <input type="checkbox" name="fill" id="fill" class="form-control" checked data-toggle="toggle">
             <label for="strict">Strict:</label>
             <input type="checkbox" name="strict" id="strict" class="form-control" checked data-toggle="toggle">
-            <input autocomplete="off" class="form-control" name="genre" placeholder="genre(s)" type="text">
+            <select name="genre" id="playlist_source" required>
+                <option value="default" selected disabled>Pick a Genre</option>
+                {% for genre in available_genres %}
+                    <option value={{ genre }}>{{ genre }}</option>
+                {% endfor %}
+            </select>
             <select name="source" id="playlist_source" required>
                 <option value="default" selected disabled>Pick a Source</option>
                 <option value="spotify">Spotify (No Playlists)</option>

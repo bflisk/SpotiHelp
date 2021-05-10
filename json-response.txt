@@ -336,3 +336,16 @@
     "world-music"
   ]
 }
+
+
+== RECOMMENDATIONS CURL REQUEST ==
+
+curl -X "GET" "https://api.spotify.com/v1/recommendations?limit=10&market=ES&seed_artists=4NHQUGzhtTLFvgF5SZesLK&seed_genres=classical%2Ccountry&seed_tracks=0c6xIDDpzE81m2q797ordA&min_acousticness=0&max_acousticness=1&min_danceability=0&max_danceability=1&min_duration_ms=0&max_duration_ms=1000&min_energy=0&max_energy=1&min_instrumentalness=0&max_instrumentalness=1&min_key=0&max_key=4&target_key=3&min_liveness=0&max_liveness=1&min_loudness=0&max_loudness=1&min_mode=0&max_mode=0&target_mode=0&min_popularity=0&min_speechiness=0&max_speechiness=1&min_tempo=100&max_tempo=150&target_tempo=130&min_valence=0&max_valence=1" -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer BQBagBP5yGrHprND2GVNcNJc5JJ-u-4DiDLp_jf1gnWnfyM8wimzcClWRFSd4yQufidtVxeVogecTPU0Z5Wnj80WwrKAmUUGLdEMdydByHuZ8dH2ZnvayFvRSL7D_K7iCBwBKeFZNnxrtPR5dRVhCqLyNW4"
+
+https://api.spotify.com/v1/recommendations?limit=100&seed_artists=flume&
+min_acousticness=0.3&max_acousticness=0.7&target_acousticness=0.5&min_danceability=0.3&
+max_danceability=0.7&target_danceability=0.5&min_energy=0.3&max_energy=0.7&target_energy=0.5&
+min_instrumentalness=0.3&max_instrumentalness=0.7&target_instrumentalness=0.5&target_key=0&min_liveness=0.3&
+max_liveness=0.7&target_liveness=0.5&min_loudness=0.3&max_loudness=0&target_loudness=0.5&min_mode=0&max_mode=1&
+min_speechiness=0.3&max_speechiness=0.7&target_speechiness=0.5&min_tempo=119.8&max_tempo=120.2&target_tempo=120&
+min_valence=0.3&max_valence=0.7&target_valence=0.5
