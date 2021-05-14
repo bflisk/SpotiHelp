@@ -39,7 +39,8 @@
               <span class="navbar-toggler-icon"></span>
             </button>
 
-            <a class="btn" href="/get-tracks" id="navbarSupportedContent">Tracks</a>
+            <a class="btn" href={{ url_for("getTracks") }} id="navbarSupportedContent">Tracks</a>
+            <a class="btn" href={{ url_for("show_user_data") }} id="navbarSupportedContent">Data</a>
             <a class="btn" href="/logout" method="post" id="navbarSupportedContent">Log Out</a>
 
             <div class="collapse navbar-collapse" id="navbarSupportedContent">

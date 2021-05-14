@@ -9,7 +9,9 @@
 import os
 import sys
 import time
+import math
 import spotipy
+import json
 import spotipy.util as util
 
 from random import sample, randrange
@@ -37,6 +39,10 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 # Initializes database and globals
 db = SQL("sqlite:///spotihelp.db")
 sp_oauth = None
+
+# Globals
+KEY = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] # Conversion values for keys
+MODE = ['Major', 'Minor'] # Conversion values for mode
 
 
 # Application
@@ -159,6 +165,103 @@ def get_playlists():
     return playlists
 
 
+# Gets the tracks off of a given playlist and returns them
+def get_tracks(playlist_source):
+    sp = create_sp() # Creates a new spotify object
+    tracks = []
+    batchIterator = 0
+
+    if playlist_source == 'liked songs':
+        # Gets all of the user's liked tracks
+        batch = sp.current_user_saved_tracks(limit=50, offset=0)['items']
+
+        while batch:
+            for track in batch:
+                tracks.append(track)
+
+            batchIterator += 1
+            batch = sp.current_user_saved_tracks(limit=50, offset=batchIterator*50)['items']
+
+    else:
+        batch = sp.playlist_tracks(playlist_source, limit=100, offset=0)['items']
+
+        while batch:
+            for track in batch:
+                tracks.append(track)
+
+            batchIterator += 1
+            batch = sp.playlist_tracks(playlist_source, limit=100, offset=batchIterator*100)['items']
+
+    return tracks
+
+
+# Returns user's general preferences for a set of playlists
+# TODO Get user's favorite artists and tracks
+def get_user_data(source_url = False):
+    if source_url != False:
+        sp = create_sp() # Creates a new spotify object
+
+        # An empty dict to store user's listening tendencies
+        user_data = {
+            "audio_features": {
+                "mode": 0,
+                "key": 0,
+                "valence": 0,
+                "speechiness": 0,
+                "instrumentalness": 0,
+                "loudness": 0,
+                "energy": 0,
+                "danceability": 0,
+                "acousticness": 0,
+                "liveness": 0,
+                "tempo": 0
+            },
+            "favorite": {
+                "artist": "",
+                "track": "",
+                "genre": ""
+            }
+        } 
+        tracks = []
+
+        # Parses playlist url and gets tracks off the playlist
+        if len(source_url) != 22:
+            playlist_id = source_url[34:56]
+        else:
+            playlist_id = source_url
+        tracks.extend(get_tracks(playlist_id))
+
+        # Packages the track ids
+        batch = []
+        for track in tracks:
+            if track['track']['id'] != None:
+                batch.append(track['track']['id'])
+
+        # Analyzes audio features of tracks
+        # TODO Add batches
+        playlist_size = 0
+        total_track_features = sp.audio_features(tracks=batch)
+
+        for features in total_track_features:
+            for feature in features:
+                try:
+                    user_data['audio_features'][feature] += features[feature] # Adds up all values for each feature
+                except:
+                    pass
+            playlist_size += 1
+        
+        # Calculates the average value for each feature
+        for feature in user_data['audio_features']:
+            user_data['audio_features'][feature] /= playlist_size
+            if feature == 'tempo' or feature == 'key' or feature == 'loudness':
+                user_data['audio_features'][feature] = round(user_data['audio_features'][feature], 0)
+            else:
+                user_data['audio_features'][feature] = round(user_data['audio_features'][feature], 3)
+
+        return user_data
+    return source_url
+
+
 # Sifts through songs to get ones with user parameters
 # TODO Add genre checking
 def sift_tracks(track_feature, playlist_options):
@@ -263,15 +366,10 @@ def widen_parms():
         else:
             session['playlist_options']['change'][change] += 0.015
 
-    print("=====================P===========================")
-    print(session['playlist_options']['change'])
-    print("=====================P===========================")
-
     return
 
+
 # Gets additional songs from Spotify
-# TODO Add functionality to search fo multiple keys
-# TODO Add functionality for min_duration_ms & max_duration_ms
 def seed_more_tracks(limit, artists, genres, total_tracks):
     sp = create_sp()
     playlist_options = session['playlist_options']
@@ -498,7 +596,7 @@ def new_playlist():
 # Displays options for the creation of a new smart playlist
 # TODO Allow user to choose popularity of songs (Only if the source is Spotify)
 # TODO Maybe allow user to use a set of artists or songs to seed a playlist
-# TODO Allow user to NOT choods an option
+# TODO Allow user to NOT choose an option
 @app.route("/playlist-new/options", methods=["GET", "POST"])
 @login_required
 def new_playlist_options():
@@ -596,10 +694,7 @@ def new_playlist_create():
     sp = create_sp() # Creates a new spotify object
     playlist_options = session['playlist_options']
 
-    # Conversion values
-    key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-    mode = ['Major', 'Minor']
-
+    # If the user confirms their options
     if request.method == "POST":
         total_tracks = [] # Tracks from every source the user specified
         total_tracks_sifted = set() # Total tracks that match user parameters (Is a set to ensure only unique tracks get added)
@@ -613,32 +708,13 @@ def new_playlist_create():
 
         # If the user specifies their liked tracks
         if 'liked songs' in playlist_options['source']:
-            # Gets all of the user's liked tracks
-            batch = sp.current_user_saved_tracks(limit=50, offset=0)['items']
-            batchIterator = 0
-
-            while batch:
-                for track in batch:
-                    total_tracks.append(track)
-
-                batchIterator += 1
-                batch = sp.current_user_saved_tracks(limit=50, offset=batchIterator*50)['items']
-
+            total_tracks.extend(get_tracks('liked songs'))
 
         # If the user specifies a playlist
         if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source']:
             for playlist_source in playlist_options['source']:
                 if playlist_source != "liked songs":
-                    # Gets the tracks off of a specific playlist
-                    batch = sp.playlist_tracks(playlist_source, limit=100, offset=0)['items']
-                    batchIterator = 0
-
-                    while batch:
-                        for track in batch:
-                            total_tracks.append(track)
-
-                        batchIterator += 1
-                        batch = sp.playlist_tracks(playlist_source, limit=100, offset=batchIterator*100)['items']
+                    total_tracks.extend(get_tracks(playlist_source))
 
 
         # Gets tracks with user parameters
@@ -760,22 +836,113 @@ def edit_specific_playlist(playlist):
     # Gets playlist information
     sp = create_sp()
     playlist_id = playlist
-    temp = sp.playlist(playlist_id)
+    playlist_info = sp.playlist(playlist_id)
 
     # Tries to get playlist art
     try:
-        playlist_art = temp['images'][0]['url']
+        playlist_art = playlist_info['images'][0]['url']
     except:
         playlist_art = ''
 
     # Parses playlist information into a list
-    playlist = {'playlist_id': playlist_id, 'playlist_name': temp['name'], 
-                'playlist_art': playlist_art, 'playlist_link': temp['external_urls']['spotify'], 
+    playlist = {'playlist_id': playlist_id, 'playlist_name': playlist_info['name'], 
+                'playlist_art': playlist_art, 'playlist_link': playlist_info['external_urls']['spotify'], 
                 'tracks': []}
     
     # Gets tracks on the playlist
-    for i in temp['tracks']['items']:
-        playlist['tracks'].append(i)
-        print(playlist['tracks'])
+    for track in playlist_info['tracks']['items']:
+        playlist['tracks'].append(track)
 
     return render_template("playlist-edit-specific.html", playlist=playlist)
+
+
+# Displays the user's listening habits
+# TODO If user's source playlists have changed, update listening habits
+# TODO Keep track of changes in listening habits
+@app.route("/data", methods=["GET", "POST"])
+@login_required
+def show_user_data():
+    sp = create_sp()
+
+    # If the user wants to add another source for their listening habits
+    # TODO Add funcionality to add multiple playlists at one time
+    if request.method == "POST":
+        sources = [] # Sources currently being added
+        db_sources = [] # Sources that were already in the database
+        sources.append(request.form.get("playlist_ids")) # A list of playlists user wants to add as sources
+
+        # Gets total playlists currently being used as sources
+        try:
+            total_playlists = len(sources) + db.execute("SELECT total_sources FROM user_data WHERE user_id=?;", session['user_id'])[0]['total_sources'] # Number of playlists
+        except:
+            total_playlists = len(sources)
+        
+        # Gets a list of the current sources used
+        try:
+            db_sources = json.loads(db.execute("SELECT sources FROM user_data WHERE user_id=?;", session['user_id'])[0]['sources'])
+        except:
+            pass
+        
+        """# Makes sure the user can't enter a source that's already being used
+        for source in sources:
+            if source in db_sources:
+                sources.remove(source)
+                print(f"{source} was not added!")"""
+
+        # Appends database sources if the list is not empty
+        if db_sources != []:
+            sources.extend(db_sources)
+
+        # An empty dict to store user's listening tendencies
+        user_data = {
+            "audio_features": {
+                "mode": 0,
+                "key": 0,
+                "valence": 0,
+                "speechiness": 0,
+                "instrumentalness": 0,
+                "loudness": 0,
+                "energy": 0,
+                "danceability": 0,
+                "acousticness": 0,
+                "liveness": 0,
+                "tempo": 0
+            },
+            "favorite": {
+                "artist": "",
+                "track": "",
+                "genre": ""
+            }
+        } 
+
+        # Loops through user's playlist sources and merges values
+        for playlist_id in sources:
+            new_data = get_user_data(playlist_id)['audio_features']
+            for feature in user_data['audio_features']:
+                user_data['audio_features'][feature] += new_data[feature]
+        
+        # Gets averages for each feature
+        for feature in user_data['audio_features']:
+            print("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[")
+            print(total_playlists)
+            user_data['audio_features'][feature] /= total_playlists
+
+        # Updates and pulls from database
+        db.execute("INSERT INTO user_data (user_id, data, num_sources, sources) VALUES (?,?,?,?);", session['user_id'], json.dumps(user_data), total_playlists, json.dumps(sources)) # Updates user data
+        user_data = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id']) # Gets updated user data
+
+        return redirect(url_for("show_user_data"))
+    else:
+        user_data = []
+        playlists = get_playlists() # Gets updates list of user's current playlists
+        try:
+            user_data = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])[0] # Gets user data
+        except:
+            user_data = ["Nothing Yet ;)"]
+        history = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])
+
+        """for data in user_data:
+            user_data.append(json.loads(data['sources']))
+            user_data.append(json.loads(data['data']))"""
+
+        return render_template("show-user-data.html", user_data=user_data, playlists=playlists, history=history)

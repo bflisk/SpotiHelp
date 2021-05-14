@@ -9,8 +9,8 @@
     <!--button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#global_prefs" aria-expanded="false" aria-controls="collapseExample">
         Global Preferences
     </button-->
-    <div id="all_prefs" class="mb-3">
-        <div id="global_prefs" class="mb-3">
+    <div id="all_prefs" class="mb-3 big-cont">
+        <div id="global_prefs" class="mb-3 small-cont">
             <h1>Global Preferences</h1>
             <label for="size">Number of songs:</label>
             <input type="number" name="size" id="size" class="form-control" min="0" max="999" required>
@@ -18,12 +18,7 @@
             <input type="checkbox" name="fill" id="fill" class="form-control" checked data-toggle="toggle">
             <label for="strict">Strict:</label>
             <input type="checkbox" name="strict" id="strict" class="form-control" checked data-toggle="toggle">
-            <select name="genre" id="playlist_source" required>
-                <option value="default" selected disabled>Pick a Genre</option>
-                {% for genre in available_genres %}
-                    <option value={{ genre }}>{{ genre }}</option>
-                {% endfor %}
-            </select>
+            <input autocomplete="off" class="form-control" name="genre" placeholder="genre(s)" type="text">
             <select name="source" id="playlist_source" required>
                 <option value="default" selected disabled>Pick a Source</option>
                 <option value="spotify">Spotify (No Playlists)</option>
@@ -104,10 +99,10 @@
             <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="liveness"><br>
             <label for="tempo">Tempo:</label>
             <input type="number" min="10" max="300" name="tempo" required><br>
-            <!--label for="avg_duration">Average Duration:</label>
+            <label for="avg_duration">Average Duration:</label>
             <input type="number" min="1" max="1800" name="avg_duration" required><br>
             <label for="total_duration">Total Duration:</label>
-            <input type="number" min="1" max="86400" name="total_duration" required><br-->
+            <input type="number" min="1" max="86400" name="total_duration" required><br>
         </div><br> 
     </div>
     
