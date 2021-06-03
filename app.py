@@ -170,6 +170,9 @@ def get_tracks(playlist_source):
     sp = create_sp() # Creates a new spotify object
     tracks = []
     batchIterator = 0
+    print("==========================================")
+    print(playlist_source)
+    print("==========================================")
 
     if playlist_source == 'liked songs':
         # Gets all of the user's liked tracks
@@ -285,8 +288,8 @@ def sift_tracks(track_feature, playlist_options):
     tempo = abs(track_feature['tempo'] - float(playlist_options['tempo'])) < 20
 
     """# Checks genre
-    for genre in track_feature['genre']:
-        if genre in playlist_options['genre']:
+    for check_genre in track_feature['genre']:
+        if check_genre in playlist_options['genre']:
             genre = True
             break"""
 
@@ -711,7 +714,7 @@ def new_playlist_create():
             total_tracks.extend(get_tracks('liked songs'))
 
         # If the user specifies a playlist
-        if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source']:
+        if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source'] or 'spotify' not in playlist_options['source']:
             for playlist_source in playlist_options['source']:
                 if playlist_source != "liked songs":
                     total_tracks.extend(get_tracks(playlist_source))
@@ -729,6 +732,9 @@ def new_playlist_create():
 
             if batchIterator % 100 == 0 and batch != None:
                 track_features = sp.audio_features(tracks=batch)
+
+                # TODO Require user to use a seed track
+
                 batchIterator = 0
                 batch = []
 
