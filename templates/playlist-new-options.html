@@ -25,7 +25,7 @@
                     <option value={{ genre }}>{{ genre }}</option>
                 {% endfor %}
             </select>
-            <select name="source" id="playlist_source" required>
+            <select name="source" id="playlist_source">
                 <option value="default" selected disabled>Pick a Source</option>
                 <!--option value="spotify">Spotify (No Playlists)</option-->
                 <option value="liked songs">Liked Songs</option>
@@ -105,10 +105,10 @@
             <input type="range" min="0" max="1" value="0.500" step="0.001" class="slider" name="liveness"><br>
             <label for="tempo">Tempo:</label>
             <input type="number" min="10" max="300" name="tempo" required><br>
-            <label for="avg_duration">Average Duration:</label>
+            <!--label for="avg_duration">Average Duration:</label>
             <input type="number" min="1" max="1800" name="avg_duration" required><br>
             <label for="total_duration">Total Duration:</label>
-            <input type="number" min="1" max="86400" name="total_duration" required><br>
+            <input type="number" min="1" max="86400" name="total_duration" required><br-->
         </div><br> 
     </div>
     
