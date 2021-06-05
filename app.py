@@ -322,6 +322,13 @@ def store_options(playlist_id):
     return
 
 
+# Stores tracks into the database to prevent copies
+def store_tracks(playlist_id, track_list):
+    for track in track_list:
+        db.execute("INSERT INTO playlist_tracks (user_id, playlist_id, track_id) VALUES (?,?,?)", session['user_id'], playlist_id, track)
+
+    return
+
 # --- Routable functions ---
 
 # Has the user log in and authorize SpotiHelp to use information from Spotify
@@ -413,20 +420,27 @@ def new_playlist():
         playlist_options.update({"size": int(request.form.get("size"))}) # Number of songs in playlist
 
         # Auto playlist management settings
-        playlist_options.update({"auto_add": request.form.get("playlist_auto_add")})
-        playlist_options.update({"auto_delete": request.form.get("playlist_auto_delete")})
+        playlist_options.update({"auto_add": [request.form.get("playlist_auto_add"), request.form.get("playlist_auto_add_replace")]})
+        playlist_options.update({"auto_delete": [request.form.get("playlist_auto_delete")]})
+
+        # Parses information
+        if playlist_options['auto_add'][0] == None:
+            playlist_options['auto_add'][0] = False
+        if playlist_options['auto_add'][1] == None:
+            playlist_options['auto_add'][1] = False
+        if playlist_options['auto_delete'][0] == None:
+            playlist_options['auto_delete'][0] = False
+        
+        if playlist_options['auto_add'] or playlist_options['auto_delete']:
+            playlist_options.update({'is_smart': True})
+        else:
+            playlist_options.update({'is_smart': False})
         
         # Parses whether playlis is public or not
         if playlist_options['public'] == 'on':
             playlist_options['public'] = True
         else:
             playlist_options['public'] = False
-
-        # Creates the playlist in the user's library
-        # sp.user_playlist_create(session['username'], name, public=pub, description=desc)
-
-        # Gets new playlist information from Spotify
-        # sp.playlist
 
         session['playlist_options'] = playlist_options
 
@@ -445,13 +459,22 @@ def new_playlist_create():
     # If the user confirms their options
     if request.method == "POST":
         total_tracks = set() # A set of unique tracks to be added to the new playlist
+        fail_count = 0
+        past_recs = None
 
-        while len(total_tracks) < playlist_options['size']:
-            total_tracks.add(sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
-                                                limit=(playlist_options['size'] - len(total_tracks) if playlist_options['size'] - len(total_tracks) < 50 else 50), country=None)['tracks'])
+        while len(total_tracks) < playlist_options['size'] and fail_count < 6:
+            # Gets a batch of seeded tracks from Spotify
+            recs = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
+                                                limit=(playlist_options['size'] - len(total_tracks) if playlist_options['size'] - len(total_tracks) < 50 else 50), country=None)['tracks']
             
-            """for track in batch:
-                total_tracks.add(track['id'])"""
+            # Makes sure there is no infinite loop
+            if past_recs == recs:
+                fail_count += 1
+            past_recs = recs
+
+            # Adds each track id one at a time
+            for rec in recs:
+                total_tracks.add(rec['id'])
 
         # Creates a new empty playlist with user parameters
         new_playlist = sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
@@ -469,10 +492,15 @@ def new_playlist_create():
                 sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
                 batch = []
 
-
         # Adds remaining tracks (< 100)
         if len(batch) > 0:
             sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
+
+        # Stores the playlist info into database
+        db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], new_playlist['id'], new_playlist['name'], new_playlist['href'], str(playlist_options['is_smart']))
+        if playlist_options['is_smart']:
+            db.execute("INSERT INTO playlist_options (user_id, playlist_id, auto_add, auto_delete) VALUES (?,?,?,?);", session['user_id'], new_playlist['id'], str(playlist_options['auto_add']), str(playlist_options['auto_delete']))
+        store_tracks(new_playlist['id'], total_tracks_list)
         
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
     else:
