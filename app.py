@@ -14,6 +14,7 @@ import spotipy
 import json
 import spotipy.util as util
 
+from pprint import pprint
 from random import sample, randrange
 from cs50 import SQL
 from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
@@ -322,6 +323,10 @@ def store_options(playlist_id):
     return
 
 
+def log_playback():
+    return
+
+
 # Stores tracks into the database to prevent copies
 def store_tracks(playlist_id, track_list):
     for track in track_list:
@@ -421,7 +426,8 @@ def new_playlist():
 
         # Auto playlist management settings
         playlist_options.update({"auto_add": [request.form.get("playlist_auto_add"), request.form.get("playlist_auto_add_replace")]})
-        playlist_options.update({"auto_delete": [request.form.get("playlist_auto_delete")]})
+        playlist_options.update({"auto_delete": [request.form.get("playlist_auto_delete"), request.form.get("playlist_auto_delete_skips_req")]})
+        playlist_options.update({"allow_explicit": request.form.get("playlist_allow_explicit")})
 
         # Parses information
         if playlist_options['auto_add'][0] == None:
@@ -460,21 +466,28 @@ def new_playlist_create():
     if request.method == "POST":
         total_tracks = set() # A set of unique tracks to be added to the new playlist
         fail_count = 0
+        recs_list = []
         past_recs = None
 
         while len(total_tracks) < playlist_options['size'] and fail_count < 6:
             # Gets a batch of seeded tracks from Spotify
-            recs = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
+            recs_dict = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
                                                 limit=(playlist_options['size'] - len(total_tracks) if playlist_options['size'] - len(total_tracks) < 50 else 50), country=None)['tracks']
             
-            # Makes sure there is no infinite loop
-            if past_recs == recs:
-                fail_count += 1
-            past_recs = recs
+            # Converts the needed values from the dictonary into a list
+            for rec in recs_dict:
+                recs_list.append(rec['id'])
+            recs_list.sort()
 
-            # Adds each track id one at a time
-            for rec in recs:
-                total_tracks.add(rec['id'])
+            # Makes sure there is no infinite loop 
+            if past_recs == recs_list:
+                fail_count += 1
+            past_recs = recs_list
+            past_recs.sort()
+
+            # Adds batch tracks into the total set
+            total_tracks |= set(recs_list)
+            
 
         # Creates a new empty playlist with user parameters
         new_playlist = sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
@@ -613,8 +626,6 @@ def show_user_data():
         
         # Gets averages for each feature
         for feature in user_data['audio_features']:
-            print("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[")
-            print(total_playlists)
             user_data['audio_features'][feature] /= total_playlists
 
         # Updates and pulls from database
@@ -623,16 +634,28 @@ def show_user_data():
 
         return redirect(url_for("show_user_data"))
     else:
-        user_data = []
+        current_user_playing_track = sp.current_user_playing_track()
+        current_playback = sp.current_playback()
+        currently_playing = sp.currently_playing()
+
+        print("====================================================================================================")
+        pprint(current_user_playing_track)
+        print("----------------------------------------------------------------------------------------------------")
+        pprint(current_playback)
+        print("----------------------------------------------------------------------------------------------------")
+        pprint(currently_playing)
+        print("====================================================================================================")
+
+        """user_data = []
         playlists = get_playlists() # Gets updates list of user's current playlists
         try:
             user_data = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])[0] # Gets user data
         except:
             user_data = ["Nothing Yet ;)"]
-        history = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])
+        history = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])"""
 
         """for data in user_data:
             user_data.append(json.loads(data['sources']))
             user_data.append(json.loads(data['data']))"""
 
-        return render_template("show-user-data.html", user_data=user_data, playlists=playlists, history=history)
+        return render_template("show-user-data.html", current_user_playing_track=current_user_playing_track, current_playback=current_playback, currently_playing=currently_playing)

@@ -5,18 +5,9 @@
 {% endblock title %}
 
 {% block body %}
-    {% if playlists != None %}
-        <form action={{ url_for("show_user_data") }} method="post">
-            <select name="playlist_ids" id="playlist_source" required>
-                <option value="default" selected disabled>Pick a Source</option>
-                <option value="spotify">Spotify (No Playlists)</option>
-                <option value="liked songs">Liked Songs</option>
-                {% for playlist in playlists %}
-                    <option value={{ playlist['playlist_id'] }}>{{ playlist['playlist_name'] }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit">Next</button>
-        </form>
-    {% endif %}
-        <ul>{{ user_data }}</ul>
+    <li>
+        <ul>{{ current_user_playing_track }}</ul><br><br>
+        <ul>{{ current_playback }}</ul><br><br>
+        <ul>{{ currently_playing }}</ul><br><br>
+    </li>
 {% endblock body %}

@@ -9,12 +9,16 @@
     <form action={{ url_for("new_playlist") }} method="post">
         <input autocomplete="off" class="form-control" name="playlist_name" placeholder="Name" type="text" required>
         <input autocomplete="off" class="form-control" name="playlist_seed_track" placeholder="Seed Track ID" type="text" required>
+
         <label for="playlist_pub">playlist_pub:</label>
         <input type="checkbox" name="playlist_pub" checked data-toggle="toggle"><br>
         <label for="playlist_auto_add">playlist_auto_add:</label>
         <input type="checkbox" name="playlist_auto_add" checked data-toggle="toggle"><br>
         <label for="playlist_auto_delete">playlist_auto_delete:</label>
         <input type="checkbox" name="playlist_auto_delete" checked data-toggle="toggle"><br>
+        <label for="playlist_allow_explicit">playlist_allow_explicit:</label>
+        <input type="checkbox" name="playlist_allow_explicit" checked data-toggle="toggle"><br>
+
         <label for="size">Number of songs:</label>
         <input type="number" name="size" id="size" class="form-control" min="0" max="500" required>
         <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Description" type="text">
