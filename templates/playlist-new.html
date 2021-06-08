@@ -21,6 +21,16 @@
 
         <label for="size">Number of songs:</label>
         <input type="number" name="size" id="size" class="form-control" min="0" max="500" required>
+
+        <label for="dev">Dev (1 minute)</label>
+        <input type="radio" id="dev" name="playlist_update_freq" value="60"><br>
+        <label for="daily">Daily</label>
+        <input type="radio" id="daily" name="playlist_update_freq" value="86400"><br>
+        <label for="weekly">Bi-Weekly</label>
+        <input type="radio" id="bi-weekly" name="playlist_update_freq" value="302400"><br>
+        <label for="weekly">Weekly</label>
+        <input type="radio" id="weekly" name="playlist_update_freq" value="604800"><br>
+
         <input autocomplete="off" class="form-control" name="playlist_desc" placeholder="Description" type="text">
         <button type="submit">Next</button>
     </form>

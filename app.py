@@ -11,6 +11,7 @@ import sys
 import time
 import math
 import spotipy
+import threading
 import json
 import spotipy.util as util
 
@@ -44,6 +45,7 @@ sp_oauth = None
 # Globals
 KEY = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] # Conversion values for keys
 MODE = ['Major', 'Minor'] # Conversion values for mode
+THREADS = {}
 
 
 # Application
@@ -323,7 +325,7 @@ def store_options(playlist_id):
     return
 
 
-def log_playback():
+def log_playback(user_id):
     return
 
 
@@ -331,6 +333,51 @@ def log_playback():
 def store_tracks(playlist_id, track_list):
     for track in track_list:
         db.execute("INSERT INTO playlist_tracks (user_id, playlist_id, track_id) VALUES (?,?,?)", session['user_id'], playlist_id, track)
+
+    return
+
+
+# Manages a user's playlist as a separate thread
+# TODO Exit the thread and close logger thread if the user deletes the playlist or turns off the smart playlist feature
+def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, seed):
+    sp = create_sp()
+    pprint("STARTED")
+
+    # TODO Starts a thread that logs user skips if the user selected the 'replace' option
+    """if playlist_options['replace']:
+        logger_thread = threading.Thread(
+            target=log_playback, args=[session['user_id']])
+        logger_thread.start()
+        THREADS[f"{session['username']}_{playlist_id}"].append(logger_thread)"""
+
+    # Loops with a user-set frequency and adds/replaces tracks according to that frequency
+    while True:
+        pprint("STARTED AGAINNNNNNNNNNNNNNNNNNNNNNNnnn")
+        # Waits the designated time interval specified
+        time.sleep(playlist_options['auto_add'][2])
+
+        # Seeds a new track to add to the playlist
+        track = sp.recommendations(
+            seed_artists=None, seed_genres=None, seed_tracks=seed, limit=1)['tracks']
+
+        # Removes a track from the given playlist if the user set the option
+        # TODO check for user-set max skips
+        """if playlist_options['replace']:
+            candidates = db.execute(
+                "SELECT track_id, num_skips FROM playlist_tracks WHERE user_id=? AND is_hearted=? AND playlist_id=?", user_id, 0, playlist_id)"""
+            
+            # Check database for most-skipped tracks and non-favorited tracks
+
+        # Checks to make sure that track has not been added before
+        if track not in playlist_tracks:
+            sp.user_playlist_add_tracks(
+                session['username'], playlist_id, track, position=None)
+
+            playlist_tracks.append(track)
+            db.execute("INSERT INTO playlist_tracks VALUES (?,?,?,?,?)",
+                       user_id, playlist_id, track, 0, 0)
+        
+        pprint("ADDED A TRACK!")
 
     return
 
@@ -425,13 +472,15 @@ def new_playlist():
         playlist_options.update({"size": int(request.form.get("size"))}) # Number of songs in playlist
 
         # Auto playlist management settings
-        playlist_options.update({"auto_add": [request.form.get("playlist_auto_add"), request.form.get("playlist_auto_add_replace")]})
+        playlist_options.update({"auto_add": [request.form.get("playlist_auto_add"), request.form.get("playlist_auto_add_replace"), int(request.form.get("playlist_update_freq"))]})
         playlist_options.update({"auto_delete": [request.form.get("playlist_auto_delete"), request.form.get("playlist_auto_delete_skips_req")]})
         playlist_options.update({"allow_explicit": request.form.get("playlist_allow_explicit")})
 
         # Parses information
         if playlist_options['auto_add'][0] == None:
             playlist_options['auto_add'][0] = False
+        else:
+            playlist_options['auto_add'][0] = True
         if playlist_options['auto_add'][1] == None:
             playlist_options['auto_add'][1] = False
         if playlist_options['auto_delete'][0] == None:
@@ -469,6 +518,7 @@ def new_playlist_create():
         recs_list = []
         past_recs = None
 
+        # Populates playlist with unique tracks
         while len(total_tracks) < playlist_options['size'] and fail_count < 6:
             # Gets a batch of seeded tracks from Spotify
             recs_dict = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
@@ -488,7 +538,6 @@ def new_playlist_create():
             # Adds batch tracks into the total set
             total_tracks |= set(recs_list)
             
-
         # Creates a new empty playlist with user parameters
         new_playlist = sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
 
@@ -512,8 +561,16 @@ def new_playlist_create():
         # Stores the playlist info into database
         db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], new_playlist['id'], new_playlist['name'], new_playlist['href'], str(playlist_options['is_smart']))
         if playlist_options['is_smart']:
-            db.execute("INSERT INTO playlist_options (user_id, playlist_id, auto_add, auto_delete) VALUES (?,?,?,?);", session['user_id'], new_playlist['id'], str(playlist_options['auto_add']), str(playlist_options['auto_delete']))
+            db.execute("INSERT INTO playlist_options (user_id, playlist_id, auto_add, replace, allow_explicit) VALUES (?,?,?,?,?);", session['user_id'], new_playlist['id'], str(playlist_options['auto_add']), str(playlist_options['auto_add'][1]), str(playlist_options['auto_add'][2]))
         store_tracks(new_playlist['id'], total_tracks_list)
+
+        # If requested, starts a new threaded process that manages the new playlist
+        pprint(playlist_options['is_smart'])
+        if playlist_options['is_smart']:
+            print("IM IN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+            manager_thread = threading.Thread(target=manage_playlist, args=[session['user_id'], new_playlist['id'], playlist_options, total_tracks, playlist_options['seed_track']])
+            manager_thread.start()
+            THREADS.update({f"{session['username']}_{new_playlist['id']}": [manager_thread]})
         
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
     else:
