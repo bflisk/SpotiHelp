@@ -11,9 +11,11 @@ import sys
 import time
 import math
 import spotipy
+import threading
 import json
 import spotipy.util as util
 
+from pprint import pprint
 from random import sample, randrange
 from cs50 import SQL
 from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
@@ -43,6 +45,7 @@ sp_oauth = None
 # Globals
 KEY = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] # Conversion values for keys
 MODE = ['Major', 'Minor'] # Conversion values for mode
+THREADS = {}
 
 
 # Application
@@ -170,9 +173,6 @@ def get_tracks(playlist_source):
     sp = create_sp() # Creates a new spotify object
     tracks = []
     batchIterator = 0
-    print("==========================================")
-    print(playlist_source)
-    print("==========================================")
 
     if playlist_source == 'liked songs':
         # Gets all of the user's liked tracks
@@ -265,118 +265,10 @@ def get_user_data(source_url = False):
     return source_url
 
 
-# Sifts through songs to get ones with user parameters
-# TODO Add genre checking
-def sift_tracks(track_feature, playlist_options):
-    # Mood
-    mode = int(track_feature['mode']) == int(playlist_options['mode']) # (0/1) Mode = Minor/Major
-    key = str(track_feature['key']) in playlist_options['key'] # Uses pitch-class notation (e.g. 0 = C, 1 = C#, 2= D)
-    valence = abs(track_feature['valence'] - float(playlist_options['valence'])) < 0.5 # (0-1)'positiveness/happiness' of track
-
-    # Vocal
-    speechiness = abs(track_feature['speechiness'] - float(playlist_options['speechiness'])) < 0.5 # (0-1) Presence of spoken word (> 0.66 = All spoken word, 0.33 < semi-spoken < 0.66, All instruments < 0.33)
-    instrumentalness = abs(track_feature['instrumentalness'] - float(playlist_options['instrumentalness'])) < 0.5 # (0-1) Absence of spoken word (> 0.5 is high confidence)
-
-    # Hype
-    loudness = abs(track_feature['loudness'] - float(playlist_options['loudness'])) < 20 # (-60 - 0) How loud a track is overall
-    energy = abs(track_feature['energy'] - float(playlist_options['energy'])) < 0.5 # (0-1) Energy brooooo
-    
-    # Other
-    danceability = abs(track_feature['danceability'] - float(playlist_options['danceability'])) < 0.5 # (0-1) How easy it is to dance to
-    acousticness = abs(track_feature['acousticness'] - float(playlist_options['acousticness'])) < 0.5 # (0-1) Confidence of how acoustic a track is
-    liveness = abs(track_feature['liveness'] - float(playlist_options['liveness'])) < 0.5 # (0-1) Probability of track being played live
-    tempo = abs(track_feature['tempo'] - float(playlist_options['tempo'])) < 20
-
-    """# Checks genre
-    for check_genre in track_feature['genre']:
-        if check_genre in playlist_options['genre']:
-            genre = True
-            break"""
-
-    # Checks if every parameter is met and returns true or false
-    allow = bool(mode * key * valence * speechiness * instrumentalness * loudness * energy * danceability * acousticness * liveness * tempo)
-    return allow
-
-
-# Calculates values for spotify from the "Simple options"
-def calculate_advanced_options(simple_options):
-    mood = int(simple_options[0])
-    vocal = int(simple_options[1])
-    hype = int(simple_options[2])
-
-    # Calculates values based on "mood"
-    if mood > 50:
-        session['playlist_options']['mode'] = 1
-    else:
-        session['playlist_options']['mode'] = 0
-
-    session['playlist_options']['valence'] = mood * 0.01
-
-    # Calculates values based on "vocal"
-    session['playlist_options']['speechiness'] = vocal * 0.01
-    session['playlist_options']['instrumentalness'] = 1 - (vocal * 0.01)
-
-    # Calculates values based on "hype"
-    session['playlist_options']['loudness'] = hype * 0.01
-    session['playlist_options']['energy'] = hype * 0.01
-
-    return
-
-
-# Gets minimum/maximum value for an option
-def get_bound(option, change):
-    bound = {}
-
-    # Calculates bounds based on user-defined parameter
-    bound.update({'min': (float(session['playlist_options'][option]) - (change/2))})
-    bound.update({'max': (float(session['playlist_options'][option]) + (change/2))})
-
-    # Rounds values to acceptable levels
-    bound['min'] = round(bound['min'], 3)
-    bound['max'] = round(bound['max'], 3)
-
-    # Makes sure that the bounds are valid
-    if option == 'loudness':
-        if bound['min'] < -60:
-            bound['min'] = -60
-        elif bound['max'] > 0:
-            bound['max'] = 0
-    elif option == 'tempo':
-        if bound['min'] < 10:
-            bound['min'] = 10
-        elif bound['max'] > 300:
-            bound['max'] = 300
-    else:
-        if bound['min'] < 0:
-            bound['mid'] = 0
-        elif bound['max'] > 1:
-            bound['max'] = 1
-
-    return bound
-
-
-# Widens parameters for seeding tracks
-# TODO Add a 'global' strict parameter and individual strict parameters. If one of them is on, change the option it corresponds to in this function, otherwise, leave it alone
-def widen_parms():
-    changes = session['playlist_options']['change']
-
-    # Loosens restrictions on allowed values for parameters by increasing change values
-    for change in changes:
-        if change == 'tempo':
-            session['playlist_options']['change'][change] += 2
-        elif change == 'loudness':
-            session['playlist_options']['change'][change] += 1
-        else:
-            session['playlist_options']['change'][change] += 0.015
-
-    return
-
-
 # Gets additional songs from Spotify
 def seed_more_tracks(limit, artists, genres, total_tracks):
     sp = create_sp()
     playlist_options = session['playlist_options']
-    changes = session['playlist_options']['change']
     results = []
     tracks = [] # Clears the seeds  
 
@@ -404,34 +296,19 @@ def seed_more_tracks(limit, artists, genres, total_tracks):
         print('error')
         return error("No seeds")
 
-    # If the user did not specify a change, sets it to zero
-    for change in changes:
-        if not changes[change]:
-            changes[change] = 0
-    
-    # If the user did not specify a mode, allows Spotify to search for any mode
-    if not playlist_options['mode']:
-        mode = [0, 1]
-    else:
-        mode = [playlist_options['mode'], playlist_options['mode']]
-
-    print("================================================")
-    print(changes)
-    print("================================================")
-
     # Fetches tracks from Spotify's recommendation system that match user parameters
-    batch = sp.recommendations(seed_artists=artists, seed_genres=genres, seed_tracks=tracks, limit=limit, country=None, 
+    batch = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']], limit=limit, country=None, 
         target_key=key, 
-        min_mode=mode[0], max_mode=mode[1], 
-        target_valence=playlist_options['valence'], min_valence=get_bound('valence', changes['valence'])['min'], max_valence=get_bound('valence', changes['valence'])['max'], 
-        target_speechiness=playlist_options['speechiness'], min_speechiness=get_bound('speechiness', changes['speechiness'])['min'], max_speechiness=get_bound('speechiness', changes['speechiness'])['max'], 
-        target_instrumentalness=playlist_options['instrumentalness'], min_instrumentalness=get_bound('instrumentalness', changes['instrumentalness'])['min'], max_instrumentalness=get_bound('instrumentalness', changes['instrumentalness'])['max'], 
-        target_loudness=playlist_options['loudness'], min_loudness=get_bound('loudness', changes['loudness'])['min'], max_loudness=get_bound('loudness', changes['loudness'])['max'], 
-        target_energy=playlist_options['energy'], min_energy=get_bound('energy', changes['energy'])['min'], max_energy=get_bound('energy', changes['energy'])['max'], 
-        target_danceability=playlist_options['danceability'], min_danceability=get_bound('danceability', changes['danceability'])['min'], max_danceability=get_bound('danceability', changes['danceability'])['max'], 
-        target_acousticness=playlist_options['acousticness'], min_acousticness=get_bound('acousticness', changes['acousticness'])['min'], max_acousticness=get_bound('acousticness', changes['acousticness'])['max'], 
-        target_liveness=playlist_options['liveness'], min_liveness=get_bound('liveness', changes['liveness'])['min'], max_liveness=get_bound('liveness', changes['liveness'])['max'], 
-        target_tempo=playlist_options['tempo'], min_tempo=get_bound('tempo', changes['tempo'])['min'], max_tempo=get_bound('tempo', changes['tempo'])['max'])['tracks']
+        min_mode=mode[0], max_mode=mode[1])['tracks'] 
+    """target_valence=playlist_options['valence'], min_valence=get_bound('valence', changes['valence'])['min'], max_valence=get_bound('valence', changes['valence'])['max'], 
+    target_speechiness=playlist_options['speechiness'], min_speechiness=get_bound('speechiness', changes['speechiness'])['min'], max_speechiness=get_bound('speechiness', changes['speechiness'])['max'], 
+    target_instrumentalness=playlist_options['instrumentalness'], min_instrumentalness=get_bound('instrumentalness', changes['instrumentalness'])['min'], max_instrumentalness=get_bound('instrumentalness', changes['instrumentalness'])['max'], 
+    target_loudness=playlist_options['loudness'], min_loudness=get_bound('loudness', changes['loudness'])['min'], max_loudness=get_bound('loudness', changes['loudness'])['max'], 
+    target_energy=playlist_options['energy'], min_energy=get_bound('energy', changes['energy'])['min'], max_energy=get_bound('energy', changes['energy'])['max'], 
+    target_danceability=playlist_options['danceability'], min_danceability=get_bound('danceability', changes['danceability'])['min'], max_danceability=get_bound('danceability', changes['danceability'])['max'], 
+    target_acousticness=playlist_options['acousticness'], min_acousticness=get_bound('acousticness', changes['acousticness'])['min'], max_acousticness=get_bound('acousticness', changes['acousticness'])['max'], 
+    target_liveness=playlist_options['liveness'], min_liveness=get_bound('liveness', changes['liveness'])['min'], max_liveness=get_bound('liveness', changes['liveness'])['max'], 
+    target_tempo=playlist_options['tempo'], min_tempo=get_bound('tempo', changes['tempo'])['min'], max_tempo=get_bound('tempo', changes['tempo'])['max'])['tracks']"""
 
     for track in batch:
         results.append(track['id'])
@@ -447,6 +324,62 @@ def store_options(playlist_id):
 
     return
 
+
+def log_playback(user_id):
+    return
+
+
+# Stores tracks into the database to prevent copies
+def store_tracks(playlist_id, track_list):
+    for track in track_list:
+        db.execute("INSERT INTO playlist_tracks (user_id, playlist_id, track_id) VALUES (?,?,?)", session['user_id'], playlist_id, track)
+
+    return
+
+
+# Manages a user's playlist as a separate thread
+# TODO Exit the thread and close logger thread if the user deletes the playlist or turns off the smart playlist feature
+def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, seed):
+    sp = create_sp()
+    pprint("STARTED")
+
+    # TODO Starts a thread that logs user skips if the user selected the 'replace' option
+    """if playlist_options['replace']:
+        logger_thread = threading.Thread(
+            target=log_playback, args=[session['user_id']])
+        logger_thread.start()
+        THREADS[f"{session['username']}_{playlist_id}"].append(logger_thread)"""
+
+    # Loops with a user-set frequency and adds/replaces tracks according to that frequency
+    while True:
+        pprint("STARTED AGAINNNNNNNNNNNNNNNNNNNNNNNnnn")
+        # Waits the designated time interval specified
+        time.sleep(playlist_options['auto_add'][2])
+
+        # Seeds a new track to add to the playlist
+        track = sp.recommendations(
+            seed_artists=None, seed_genres=None, seed_tracks=seed, limit=1)['tracks']
+
+        # Removes a track from the given playlist if the user set the option
+        # TODO check for user-set max skips
+        """if playlist_options['replace']:
+            candidates = db.execute(
+                "SELECT track_id, num_skips FROM playlist_tracks WHERE user_id=? AND is_hearted=? AND playlist_id=?", user_id, 0, playlist_id)"""
+            
+            # Check database for most-skipped tracks and non-favorited tracks
+
+        # Checks to make sure that track has not been added before
+        if track not in playlist_tracks:
+            sp.user_playlist_add_tracks(
+                session['username'], playlist_id, track, position=None)
+
+            playlist_tracks.append(track)
+            db.execute("INSERT INTO playlist_tracks VALUES (?,?,?,?,?)",
+                       user_id, playlist_id, track, 0, 0)
+        
+        pprint("ADDED A TRACK!")
+
+    return
 
 # --- Routable functions ---
 
@@ -520,41 +453,6 @@ def logout():
     return redirect(url_for("index"))
 
 
-# Gets user saved tracks
-@app.route("/get-tracks", methods=["GET", "POST"])
-@login_required
-def getTracks():
-    sp = create_sp() # Creates a new spotify object 
-    total_tracks = sp.current_user_saved_tracks(limit=1, offset=0)['total'] # Total tracks user has saved
-    result_size = 20 # Amounts of tracks to show per page
-
-    if request.method == "POST": 
-        pageNum = session["track_pageNum"] # Gets the current page number
-        pageNum += int(request.form.get("page")) # Moves one page forward or backward
-
-        # If the user specifies a page number, take them there
-        if request.form.get("pageSearch"):
-            pageNum = int(request.form.get("pageSearch"))
-
-        # Makes sure page number is valid
-        if pageNum < 0:
-            pageNum = 0
-        elif pageNum > total_tracks/result_size:
-            pageNum = int(total_tracks/result_size) 
-        
-        session["track_pageNum"] = pageNum # Sets the session's page number       
-        saved_tracks = sp.current_user_saved_tracks(limit=result_size, offset=pageNum * result_size)['items'] # Retrieves the designated page of user tracks
-
-        return render_template("get-tracks.html", saved_tracks=saved_tracks, total_tracks=total_tracks, pageNum=pageNum)
-    else:
-        pageNum = 0 # Default value for initially loaded page
-        session["track_pageNum"] = pageNum # Sets the session's page number
-
-        saved_tracks = sp.current_user_saved_tracks(limit=result_size, offset=0)['items'] # Retrieves the designated page of user tracks
-
-        return render_template("get-tracks.html", saved_tracks=saved_tracks, total_tracks=total_tracks, pageNum=pageNum)
-
-
 # Allows the user to create new smart playlists
 @app.route("/playlist-new", methods=["GET", "POST"])
 @login_required
@@ -570,6 +468,28 @@ def new_playlist():
         playlist_options.update({"name": request.form.get("playlist_name")})
         playlist_options.update({"public": request.form.get("playlist_pub")})
         playlist_options.update({"description": request.form.get("playlist_desc")})
+        playlist_options.update({"seed_track": str(request.form.get("playlist_seed_track"))}) # Gets a list of track ids that will be used to seed a new playlist
+        playlist_options.update({"size": int(request.form.get("size"))}) # Number of songs in playlist
+
+        # Auto playlist management settings
+        playlist_options.update({"auto_add": [request.form.get("playlist_auto_add"), request.form.get("playlist_auto_add_replace"), int(request.form.get("playlist_update_freq"))]})
+        playlist_options.update({"auto_delete": [request.form.get("playlist_auto_delete"), request.form.get("playlist_auto_delete_skips_req")]})
+        playlist_options.update({"allow_explicit": request.form.get("playlist_allow_explicit")})
+
+        # Parses information
+        if playlist_options['auto_add'][0] == None:
+            playlist_options['auto_add'][0] = False
+        else:
+            playlist_options['auto_add'][0] = True
+        if playlist_options['auto_add'][1] == None:
+            playlist_options['auto_add'][1] = False
+        if playlist_options['auto_delete'][0] == None:
+            playlist_options['auto_delete'][0] = False
+        
+        if playlist_options['auto_add'] or playlist_options['auto_delete']:
+            playlist_options.update({'is_smart': True})
+        else:
+            playlist_options.update({'is_smart': False})
         
         # Parses whether playlis is public or not
         if playlist_options['public'] == 'on':
@@ -577,117 +497,11 @@ def new_playlist():
         else:
             playlist_options['public'] = False
 
-        # Creates the playlist in the user's library
-        # sp.user_playlist_create(session['username'], name, public=pub, description=desc)
-
-        # Gets new playlist information from Spotify
-        #sp.playlist
-
-        # Tries to get playlist art
-        try:
-            playlist_art = playlist['images'][0]['url']
-        except:
-            playlist_art = ''
-
         session['playlist_options'] = playlist_options
-
-        return redirect(url_for("new_playlist_options"))
-    else:
-        return render_template("playlist-new.html")
-
-
-# Displays options for the creation of a new smart playlist
-# TODO Allow user to choose popularity of songs (Only if the source is Spotify)
-# TODO Maybe allow user to use a set of artists or songs to seed a playlist
-# TODO Allow user to NOT choose an option
-@app.route("/playlist-new/options", methods=["GET", "POST"])
-@login_required
-def new_playlist_options():
-    sp = create_sp() # Creates a new spotify object
-
-    if request.method == "POST":
-        playlist_options = session['playlist_options']
-
-        # Required preferences
-        playlist_options.update({"source": []}) # Initializes the list of sources the user wants to pull songs from
-        playlist_options.update({"change": {}}) # Initializes the changes in options if not enough songs are added to the playlist
-        playlist_options.update({"key": []}) # Stores the keys the user wants tracks to be in
-        playlist_options.update({"genre": []}) # Sotres a list of genres the user wants to pull from
-
-        # Global preferences 
-        playlist_options.update({"size": int(request.form.get("size"))}) # Number of songs in playlist
-        playlist_options["source"].append(request.form.get("source")) # Outputs the playlist ID
-        playlist_options.update({"fill": request.form.get("fill")}) # Fills playlist with tracks from Spotify if user's sources don't have enough songs
-        playlist_options.update({"strict": request.form.get("strict")}) # If true, widens search parameters if the user does not have enough songs in their library
-        playlist_options["genre"].append(request.form.get("genre"))
-
-        # Simple Preferences 
-        playlist_options.update({"mood": request.form.get("mood")})
-        playlist_options["change"].update({"mood": request.form.get("mood_change")})
-        playlist_options.update({"vocal": request.form.get("vocal")})
-        playlist_options["change"].update({"vocal": request.form.get("vocal_change")})      
-        playlist_options.update({"hype": request.form.get("hype")})
-        playlist_options["change"].update({"hype": request.form.get("hype_change")})
-
-        # Advanced Preferences 
-        # Mood
-        playlist_options.update({"mode": request.form.get("mode")}) # (0/1) Mode = Minor/Major
-        playlist_options["key"].append(request.form.get("key")) # Uses pitch-class notation (e.g. 0 = C, 1 = C#, 2= D)
-        playlist_options.update({"valence": request.form.get("valence")}) # (0-1)'positiveness/happiness' of track
-        playlist_options["change"].update({"valence": request.form.get("valence_change")})
-
-        # Vocal
-        playlist_options.update({"speechiness": request.form.get("speechiness")}) # (0-1) Presence of spoken word (> 0.66 = All spoken word, 0.33 < semi-spoken < 0.66, All instruments < 0.33)
-        playlist_options["change"].update({"speechiness": request.form.get("speechiness_change")})
-        playlist_options.update({"instrumentalness": request.form.get("instrumentalness")}) # (0-1) Absence of spoken word (> 0.5 is high confidence)
-        playlist_options["change"].update({"instrumentalness": request.form.get("instrumentalness_change")})
-
-        # Hype
-        playlist_options.update({"loudness": request.form.get("loudness")}) # (-60 - 0) How loud a track is overall
-        playlist_options["change"].update({"loudness": request.form.get("loudness_change")})
-        playlist_options.update({"energy": request.form.get("energy")}) # (0-1) Energy brooooo
-        playlist_options["change"].update({"energy": request.form.get("energy_change")})
-        
-        # Other
-        playlist_options.update({"danceability": request.form.get("danceability")}) # (0-1) How easy it is to dance to
-        playlist_options["change"].update({"danceability": request.form.get("danceability_change")})
-        playlist_options.update({"acousticness": request.form.get("acousticness")}) # (0-1) Confidence of how acoustic a track is
-        playlist_options["change"].update({"acousticness": request.form.get("acousticness_change")})
-        playlist_options.update({"liveness": request.form.get("liveness")}) # (0-1) Probability of track being played live
-        playlist_options["change"].update({"liveness": request.form.get("liveness_change")})
-        playlist_options.update({"tempo": request.form.get("tempo")}) # TODO Find out tempo range
-        playlist_options["change"].update({"tempo": request.form.get("tempo_change")})
-        playlist_options.update({"avg_duration": request.form.get("avg_duration")}) # Average song duration
-        playlist_options.update({"total_duration": request.form.get("total_duration")}) # Total playlist duration #TODO Create formula for deviation from user specified value
-        
-        # TODO Add JS to send correct data instead of parsing it in Python
-        # Parses whether playlist is major or minor
-        if playlist_options['mode'] == 'on':
-            playlist_options['mode'] = 1
-        else:
-            playlist_options['mode'] = 0
-
-        # Parses fill option into the correct format
-        if playlist_options['fill'] == 'on':
-            playlist_options['fill'] = True
-        else:
-            playlist_options['fill'] = False
-
-        # Parses strict option into the correct format
-        if playlist_options['strict'] == 'on':
-            playlist_options['strict'] = True
-        else:
-            playlist_options['strict'] = False
-
-        # TODO Make sure simple and advanced preferences are mutually exclusive
-        session['playlist_options'] = playlist_options # Stores the new playlist's options in the session
 
         return redirect(url_for("new_playlist_create"))
     else:
-        playlists = get_playlists() # Gets current list of user's playlists
-        available_genres = sp.recommendation_genre_seeds()['genres'] # Gets a current list of genres supported by Spotify
-
-        return render_template("playlist-new-options.html", playlists=playlists, available_genres=available_genres)
+        return render_template("playlist-new.html")
 
 
 # Prompts for final options and creates the user-generated smart playlist
@@ -699,108 +513,40 @@ def new_playlist_create():
 
     # If the user confirms their options
     if request.method == "POST":
-        total_tracks = [] # Tracks from every source the user specified
-        total_tracks_sifted = set() # Total tracks that match user parameters (Is a set to ensure only unique tracks get added)
+        total_tracks = set() # A set of unique tracks to be added to the new playlist
+        fail_count = 0
+        recs_list = []
+        past_recs = None
 
+        # Populates playlist with unique tracks
+        while len(total_tracks) < playlist_options['size'] and fail_count < 6:
+            # Gets a batch of seeded tracks from Spotify
+            recs_dict = sp.recommendations(seed_artists=None, seed_genres=None, seed_tracks=[playlist_options['seed_track']],
+                                                limit=(playlist_options['size'] - len(total_tracks) if playlist_options['size'] - len(total_tracks) < 50 else 50), country=None)['tracks']
+            
+            # Converts the needed values from the dictonary into a list
+            for rec in recs_dict:
+                recs_list.append(rec['id'])
+            recs_list.sort()
 
-        # If the user used simple options instead of advanced options
-        if playlist_options['mood'] != None:
-            calculate_advanced_options([playlist_options['mood'], playlist_options['vocal'], playlist_options['hype']])
-            playlist_options = session['playlist_options']
+            # Makes sure there is no infinite loop 
+            if past_recs == recs_list:
+                fail_count += 1
+            past_recs = recs_list
+            past_recs.sort()
 
-
-        # If the user specifies their liked tracks
-        if 'liked songs' in playlist_options['source']:
-            total_tracks.extend(get_tracks('liked songs'))
-
-        # If the user specifies a playlist
-        if len(playlist_options['source']) > 1 or 'liked songs' not in playlist_options['source'] or 'spotify' not in playlist_options['source']:
-            for playlist_source in playlist_options['source']:
-                if playlist_source != "liked songs":
-                    total_tracks.extend(get_tracks(playlist_source))
-
-
-        # Gets tracks with user parameters
-        batch = []
-        batchIterator = 0
-
-        # Loops through the tracks to find ones with similar parameters to what the user wants
-        for track in total_tracks:
-            if track['track']['id'] != None:
-                batch.append(track['track']['id'])
-            batchIterator += 1
-
-            if batchIterator % 100 == 0 and batch != None:
-                track_features = sp.audio_features(tracks=batch)
-
-                # TODO Require user to use a seed track
-
-                batchIterator = 0
-                batch = []
-
-                # Loops through audio features and adds tracks that match user parameters
-                for track_feature in track_features:
-                    if sift_tracks(track_feature, playlist_options):
-                        total_tracks_sifted.add(track_feature['id'])
-
-
-        # Checks that the number of tracks equals the playlist size the user specified
-        # If there are not enough tracks, seed more
-        if len(total_tracks_sifted) < int(playlist_options['size']) and playlist_options['fill']:
-            limit = int(playlist_options['size']) - len(total_tracks_sifted) # Number of tracks needed to fill the playlist
-            remaining = limit
-            seeds = {'artists': [], 'genres': playlist_options['genre'], 'tracks': []} # Seeds used to get similar tracks from Spotify
-            past_total_tracks_sifted = "foo"
-            fail_count = 0
-
-            # Keeps looping until the playlist tracks get filled or there are no more tracks to fill
-            while len(total_tracks_sifted) < int(playlist_options['size']):  
-                # Widens parameters when there are not enough tracks to fill
-                if past_total_tracks_sifted == total_tracks_sifted and playlist_options['strict'] == False:
-                    fail_count += 1
-                    widen_parms()
-                elif (past_total_tracks_sifted == total_tracks_sifted and playlist_options['strict'] == True) or fail_count == 50:
-                    break
-
-                past_total_tracks_sifted = total_tracks_sifted # Used to make sure there are tracks left to seed
-
-                # Seeds tracks in batches of 100
-                for i in range(limit):
-                    if i % 100 == 0:
-                        total_tracks_sifted = total_tracks_sifted.union(seed_more_tracks(100, seeds['artists'], seeds['genres'], total_tracks_sifted))
-                        print(f"Tracks after additions: {total_tracks_sifted}")
-                        remaining -= 100
-
-                # Seeds remaining tracks
-                if remaining > 0:
-                    total_tracks_sifted = total_tracks_sifted.union(seed_more_tracks(remaining, seeds['artists'], seeds['genres'], total_tracks_sifted))
-
-                # TODO If there are not enough tracks and the user deselected the 'strict' options, widen parameters and seed more tracks. Otherwise, re-seed tracks and add unique ones
-
-        # Gets last track features (< 100)
-        track_features = sp.audio_features(tracks=batch)
-        for track_feature in track_features:
-            if sift_tracks(track_feature, playlist_options):
-                total_tracks_sifted.add(track_feature['id'])
-        
-        # If there are too many tracks, delete the extras
-        if len(total_tracks_sifted) > int(playlist_options['size']):
-            limit = len(total_tracks_sifted) - int(playlist_options['size']) # Number of tracks needed to delete from the playlist
-
-            # Removes tracks from the list at random until it hits the desired playlist size
-            for i in range(limit):
-                total_tracks_sifted.pop()
-
-
+            # Adds batch tracks into the total set
+            total_tracks |= set(recs_list)
+            
         # Creates a new empty playlist with user parameters
         new_playlist = sp.user_playlist_create(session['username'], playlist_options['name'], public=session['playlist_options']['public'], description=session['playlist_options']['description'])
 
         # Adds tracks to playlist
         batch = []
-        total_tracks_sifted = list(total_tracks_sifted) # Converts the set into a list
+        total_tracks_list = list(total_tracks) # Converts the set into a list
 
-        for batchIterator in range(len(total_tracks_sifted)):
-            batch.append(total_tracks_sifted[batchIterator])
+        for batchIterator in range(len(total_tracks_list)):
+            batch.append(total_tracks_list[batchIterator])
             batchIterator += 1 
 
             # Adds tracks in batches of 100
@@ -808,18 +554,26 @@ def new_playlist_create():
                 sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
                 batch = []
 
-
         # Adds remaining tracks (< 100)
         if len(batch) > 0:
             sp.user_playlist_add_tracks(session['username'], new_playlist['id'], batch, position=None)
+
+        # Stores the playlist info into database
+        db.execute("INSERT INTO playlists VALUES (?,?,?,?,?);", session['user_id'], new_playlist['id'], new_playlist['name'], new_playlist['href'], str(playlist_options['is_smart']))
+        if playlist_options['is_smart']:
+            db.execute("INSERT INTO playlist_options (user_id, playlist_id, auto_add, replace, allow_explicit) VALUES (?,?,?,?,?);", session['user_id'], new_playlist['id'], str(playlist_options['auto_add']), str(playlist_options['auto_add'][1]), str(playlist_options['auto_add'][2]))
+        store_tracks(new_playlist['id'], total_tracks_list)
+
+        # If requested, starts a new threaded process that manages the new playlist
+        pprint(playlist_options['is_smart'])
+        if playlist_options['is_smart']:
+            print("IM IN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+            manager_thread = threading.Thread(target=manage_playlist, args=[session['user_id'], new_playlist['id'], playlist_options, total_tracks, playlist_options['seed_track']])
+            manager_thread.start()
+            THREADS.update({f"{session['username']}_{new_playlist['id']}": [manager_thread]})
         
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=True)
     else:
-        # If the user used simple options instead of advanced options
-        if playlist_options['mood'] != None:
-            calculate_advanced_options([playlist_options['mood'], playlist_options['vocal'], playlist_options['hype']])
-            playlist_options = session['playlist_options']
-
         return render_template("playlist-new-create.html", playlist_options=playlist_options, created=False)
 
 
@@ -929,8 +683,6 @@ def show_user_data():
         
         # Gets averages for each feature
         for feature in user_data['audio_features']:
-            print("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[")
-            print(total_playlists)
             user_data['audio_features'][feature] /= total_playlists
 
         # Updates and pulls from database
@@ -939,16 +691,28 @@ def show_user_data():
 
         return redirect(url_for("show_user_data"))
     else:
-        user_data = []
+        current_user_playing_track = sp.current_user_playing_track()
+        current_playback = sp.current_playback()
+        currently_playing = sp.currently_playing()
+
+        print("====================================================================================================")
+        pprint(current_user_playing_track)
+        print("----------------------------------------------------------------------------------------------------")
+        pprint(current_playback)
+        print("----------------------------------------------------------------------------------------------------")
+        pprint(currently_playing)
+        print("====================================================================================================")
+
+        """user_data = []
         playlists = get_playlists() # Gets updates list of user's current playlists
         try:
             user_data = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])[0] # Gets user data
         except:
             user_data = ["Nothing Yet ;)"]
-        history = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])
+        history = db.execute("SELECT * FROM user_data WHERE user_id=?;", session['user_id'])"""
 
         """for data in user_data:
             user_data.append(json.loads(data['sources']))
             user_data.append(json.loads(data['data']))"""
 
-        return render_template("show-user-data.html", user_data=user_data, playlists=playlists, history=history)
+        return render_template("show-user-data.html", current_user_playing_track=current_user_playing_track, current_playback=current_playback, currently_playing=currently_playing)
