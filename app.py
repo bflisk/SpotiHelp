@@ -325,7 +325,26 @@ def store_options(playlist_id):
     return
 
 
+# Tracks user playback and logs track skips
 def log_playback(user_id):
+    sp = create_sp()
+    past_track_id = None
+
+    while True:
+        # TODO change current_playback()
+        current_track_id = sp.current_playback()
+        track_position = sp.current_playback()
+
+        if current_track_id != past_track_id:
+            if track_position < track_duration / 2:
+                db.execute("UPDATE") # TODO Add a skip to the track
+
+            track_duration = sp.current_playback()
+
+        past_track_id = current_track_id
+
+        time.sleep(2)
+
     return
 
 
@@ -337,12 +356,20 @@ def store_tracks(playlist_id, track_list):
     return
 
 
+# Seeds a new track from a given track
+def seed_new_track(seed):
+    sp = create_sp()
+
+    track = sp.recommendations(
+            seed_artists=None, seed_genres=None, seed_tracks=[seed], limit=1)['tracks']
+    track_id = track[0]['id']
+
+    return track_id
+
+
 # Manages a user's playlist as a separate thread
 # TODO Exit the thread and close logger thread if the user deletes the playlist or turns off the smart playlist feature
-def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, seed):
-    sp = create_sp()
-    pprint("STARTED")
-
+def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, seed, session):
     # TODO Starts a thread that logs user skips if the user selected the 'replace' option
     """if playlist_options['replace']:
         logger_thread = threading.Thread(
@@ -352,13 +379,13 @@ def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, see
 
     # Loops with a user-set frequency and adds/replaces tracks according to that frequency
     while True:
-        pprint("STARTED AGAINNNNNNNNNNNNNNNNNNNNNNNnnn")
+        sp = create_sp()
+
         # Waits the designated time interval specified
         time.sleep(playlist_options['auto_add'][2])
 
         # Seeds a new track to add to the playlist
-        track = sp.recommendations(
-            seed_artists=None, seed_genres=None, seed_tracks=seed, limit=1)['tracks']
+        track_id = seed_new_track(seed)
 
         # Removes a track from the given playlist if the user set the option
         # TODO check for user-set max skips
@@ -366,18 +393,23 @@ def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, see
             candidates = db.execute(
                 "SELECT track_id, num_skips FROM playlist_tracks WHERE user_id=? AND is_hearted=? AND playlist_id=?", user_id, 0, playlist_id)"""
             
-            # Check database for most-skipped tracks and non-favorited tracks
+            # TODO Check database for most-skipped tracks and non-favorited tracks
 
-        # Checks to make sure that track has not been added before
-        if track not in playlist_tracks:
-            sp.user_playlist_add_tracks(
-                session['username'], playlist_id, track, position=None)
+        # Checks to make sure that track has not been added before and seeds another one if it has been added
+        fail_count = 0
+        while fail_count < 50:
+            if track_id not in playlist_tracks:
+                sp.user_playlist_add_tracks(
+                    session['username'], playlist_id, [track_id], position=None)
 
-            playlist_tracks.append(track)
-            db.execute("INSERT INTO playlist_tracks VALUES (?,?,?,?,?)",
-                       user_id, playlist_id, track, 0, 0)
-        
-        pprint("ADDED A TRACK!")
+                playlist_tracks.add(track_id)
+                db.execute("INSERT INTO playlist_tracks (user_id, playlist_id, track_id) VALUES (?,?,?)",
+                        user_id, playlist_id, track_id)
+                break
+            else:
+                track_id = seed_new_track(seed)
+                fail_count += 1
+
 
     return
 
@@ -565,10 +597,8 @@ def new_playlist_create():
         store_tracks(new_playlist['id'], total_tracks_list)
 
         # If requested, starts a new threaded process that manages the new playlist
-        pprint(playlist_options['is_smart'])
         if playlist_options['is_smart']:
-            print("IM IN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
-            manager_thread = threading.Thread(target=manage_playlist, args=[session['user_id'], new_playlist['id'], playlist_options, total_tracks, playlist_options['seed_track']])
+            manager_thread = threading.Thread(target=manage_playlist, args=[session['user_id'], new_playlist['id'], playlist_options, total_tracks, playlist_options['seed_track'], session])
             manager_thread.start()
             THREADS.update({f"{session['username']}_{new_playlist['id']}": [manager_thread]})
         
