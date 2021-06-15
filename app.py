@@ -414,6 +414,11 @@ def manage_playlist(user_id, playlist_id, playlist_options, playlist_tracks, see
     return
 
 # --- Routable functions ---
+# Manages the request context
+@app.context_processor
+def context_processor():
+    return dict(session)
+
 
 # Has the user log in and authorize SpotiHelp to use information from Spotify
 @app.route("/login", methods=["GET", "POST"])
